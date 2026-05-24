@@ -6,3 +6,5 @@ services:
     container_name: uapp_api_service
     network_mode: "host"
     restart: unless-stopped
+    volumes:
+      - ./adb-keys:/root/.android
