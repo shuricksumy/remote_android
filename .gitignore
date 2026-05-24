@@ -1,0 +1,13 @@
+# Exclude Python virtual environments
+.venv/
+.idea/
+venv/
+__pycache__/
+*.pyc
+
+# Exclude all validation/error screenshots
+*.png
+
+# Exclude OS-specific metadata files
+.DS_Store
+Thumbs.db

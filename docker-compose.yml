@@ -1,0 +1,8 @@
+version: '3.8'
+
+services:
+  uapp-api:
+    build: .
+    container_name: uapp_api_service
+    network_mode: "host"
+    restart: unless-stopped
