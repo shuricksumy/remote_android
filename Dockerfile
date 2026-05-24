@@ -11,6 +11,6 @@ RUN pip install --no-cache-dir uiautomator2 upnpclient fastapi uvicorn
 
 COPY app.py .
 
-EXPOSE 8000
+EXPOSE 8833
 
 CMD ["python", "app.py"]

@@ -3,6 +3,7 @@ version: '3.8'
 services:
   uapp-api:
     build: .
+    image: uapp-automation-api:latest
     container_name: uapp_api_service
     network_mode: "host"
     restart: unless-stopped
