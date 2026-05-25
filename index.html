@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -71,25 +72,36 @@
             gap: 8px;
         }
 
+        /* 🚀 CLEAN LAYOUT FIX: Reverted to standard responsive box container rules */
         .image-viewport {
             flex: 1;
-            background-color: #000000;
+            background-color: #111115;
             border-radius: 12px;
             border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            box-sizing: border-box;
+            max-height: calc(100vh - 130px);
+            width: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
-            position: relative;
-            padding: 0px; /* Zero padding inside for edge-to-edge stream container graphics */
-            box-sizing: border-box;
-            max-height: calc(100vh - 130px);
+        }
+
+        /* 🚀 CLEAN LAYOUT FIX: Reset iframe back to native clean 100% dimensions */
+        #streamFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #000;
         }
 
         .action-footer-row {
             margin-top: 16px;
             display: flex;
             gap: 12px;
+            position: relative;
+            z-index: 10;
         }
 
         /* ==============================================================================
@@ -301,7 +313,6 @@
         <iframe 
             id="streamFrame"
             src="" 
-            style="width: 100%; height: 100%; border: none; background: #000;"
             allow="autoplay; encrypted-media">
         </iframe>
     </div>
@@ -377,7 +388,6 @@
         ? "http://localhost:8833"
         : window.location.origin;
 
-    // Hardcoded device matching backend architecture configuration 
     const DEVICE_IP = "192.168.111.48:5555";
 
     const statusBadge = document.getElementById('statusBadge');
@@ -413,24 +423,34 @@
         consoleBox.innerHTML = '<div class="log-row"><span class="timestamp">[' + new Date().toLocaleTimeString() + ']</span> Logs cleared.</div>';
     }
 
-    // 🚀 FIXED: Binds the iframe using the strict hash routing layout syntax required by NetrisTV ws-scrcpy
     function initializeLiveStream() {
         snapBtn.disabled = true;
         snapSpinner.style.display = "inline-block";
         log("📡 Connecting browser layout canvas over WebSocket port 8834...");
 
-        // Construct the host interface URL using the browser origin dynamically pointing to port 8834
         const hostIp = window.location.hostname || "localhost";
+        
+        const targetPort = "8834";
+        const proxyPort = "8886";
+        const cleanDeviceIp = "192.168.111.48";
+        const devicePort = "5555";
 
-        // ⚡ CHANGE: Changed from `/?action=stream` to `/#!/stream` to register player canvas arguments correctly
-        const targetStreamUrl = `http://${hostIp}:8834/#!/stream?action=stream&udid=${DEVICE_IP}&decoder=mse`;
+        const baseHash = `#!action=stream`;
+        const deviceUdid = `&udid=${cleanDeviceIp}%3A${devicePort}`;
+        const playerType = `&player=mse`;
+        
+        // 🚀 THE NATIVE SOLUTION: Appending '&fit=true' tells the internal ws-scrcpy script to 
+        // scale the player canvas perfectly to fill up 100% of the viewport height natively!
+        const wsTunnel = `&ws=ws%3A%2F%2F${hostIp}%3A${targetPort}%2F%3Faction%3Dproxy-adb%26remote%3Dtcp%253A${proxyPort}%26udid%3D${cleanDeviceIp}%253A${devicePort}&fit=true`;
+
+        const targetStreamUrl = `http://${hostIp}:${targetPort}/${baseHash}${deviceUdid}${playerType}${wsTunnel}`;
 
         streamFrame.src = targetStreamUrl;
-
+        
         setTimeout(() => {
             snapBtn.disabled = false;
             snapSpinner.style.display = "none";
-            log("🟢 Live mirror active! Interact directly within the left-side frame context layout.", "success");
+            log("🟢 Native browser viewport tracking initialized.", "success");
         }, 1200);
     }
 
@@ -547,7 +567,6 @@
         }
     }
 
-    // Auto-boot streaming iframe link 1.5 seconds after interface window load completes
     window.addEventListener('DOMContentLoaded', () => {
         setTimeout(initializeLiveStream, 1500);
     });

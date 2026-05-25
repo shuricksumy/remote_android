@@ -9,5 +9,9 @@ services:
     restart: unless-stopped
     volumes:
       - ./adb-keys:/root/.android
+      - /dev/bus/usb:/dev/bus/usb
     environment:
       - PYTHONUNBUFFERED=1
+      - WS_SCRCPY_CONFIG=/app/config.yaml
+      # 🚀 INJECTED HERE: One single source of truth for your static IP!
+      - DEVICE_IP=192.168.111.48:5555

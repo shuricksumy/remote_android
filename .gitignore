@@ -4,6 +4,7 @@
 venv/
 __pycache__/
 *.pyc
+/adb-keys/
 
 # Exclude all validation/error screenshots
 *.png

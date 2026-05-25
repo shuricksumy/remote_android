@@ -1,11 +1,10 @@
 # ==============================================================================
 # STAGE 1: ISOLATED WEB BUILDER INTERFACES
 # ==============================================================================
-# Use the exact same base image to guarantee Node.js C++ binding compatibility
-FROM python:3.11-alpine AS web-builder
+# Use Node 18 LTS to guarantee compatibility with ws-scrcpy's native C++ modules
+FROM node:18-alpine AS web-builder
 
-# Install core native dependencies required to download and compile git assets
-RUN apk add --no-cache git make g++ gcc musl-dev nodejs npm
+RUN apk add --no-cache git python3 make g++ gcc musl-dev
 
 WORKDIR /build
 
@@ -18,37 +17,40 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git . && \
 # ==============================================================================
 # STAGE 2: FINAL PRODUCTION PYTHON RUNTIME
 # ==============================================================================
-FROM python:3.11-alpine
+# Must use the exact same Node 18 base image so the compiled C++ binaries match the engine!
+FROM node:18-alpine
 
-# Install standard system automation assets (ADB, Node, and video rendering libs)
-# Notice we DO NOT install make or gcc here, keeping the image ultra-light!
+# Install Python, ADB, scrcpy, and required system tools directly via apk
 RUN apk add --no-cache \
+    python3 \
+    py3-pip \
     android-tools \
-    nodejs \
-    npm \
     ffmpeg \
     mesa-gl \
     libusb \
     scrcpy
 
-# Copy the completely compiled project safely to /opt (bypassing npm install entirely)
+# Copy the perfectly compiled project from Stage 1 safely to /opt
 COPY --from=web-builder /build /opt/ws-scrcpy
 
-# Create a clean, direct execution wrapper link that doesn't trigger C++ rebuilds
+# Create a clean, direct execution wrapper link for ws-scrcpy
 RUN echo '#!/bin/sh' > /usr/local/bin/ws-scrcpy && \
     echo 'node /opt/ws-scrcpy/dist/index.js "$@"' >> /usr/local/bin/ws-scrcpy && \
     chmod +x /usr/local/bin/ws-scrcpy
 
 WORKDIR /app
 
-# Install your Python FastAPI framework requirements directly inline
-RUN pip install --no-cache-dir fastapi uvicorn uiautomator2 upnpclient
+# Allow pip to install global packages safely inside the Alpine container
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
+
+# Install your Python FastAPI framework requirements
+RUN pip3 install --no-cache-dir fastapi uvicorn uiautomator2 upnpclient
 
 # Copy over your core web application logic scripts
-COPY app.py index.html .
+COPY app.py index.html config.yaml .
 
-# Expose your standard control interfaces (8833 and 8834 run on host mode anyway)
+# Expose your standard control interfaces (8833 for FastAPI, 8834 for Video Socket)
 EXPOSE 8833 8834
 
-# Fire up your Python orchestrator daemon
-CMD ["python", "app.py"]
+# Fire up your Python orchestrator daemon (using python3 command explicitly)
+CMD ["python3", "app.py"]

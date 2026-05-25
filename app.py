@@ -2,6 +2,7 @@ import contextlib
 import multiprocessing
 import subprocess
 import time
+import os
 import threading
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse
@@ -11,7 +12,7 @@ import upnpclient
 # ==============================================================================
 # 1. CONFIGURATION & TARGETS
 # ==============================================================================
-DEVICE_IP = "192.168.111.48:5555"
+DEVICE_IP = os.environ.get("DEVICE_IP", "192.168.111.48:5555")
 PACKAGE_NAME = "com.extreamsd.usbaudioplayerpro"
 GLOBAL_TIMEOUT = 10.0
 UPNP_FRIENDLY_NAME = "MI Player"
@@ -45,24 +46,27 @@ def cron_worker_loop(stop_event: threading.Event):
 async def lifespan(app_inst: FastAPI):
     """Handles startup background thread spawning and explicit ws-scrcpy process attachment."""
 
+@contextlib.asynccontextmanager
+async def lifespan(app_inst: FastAPI):
+    """Handles startup background thread spawning and explicit ws-scrcpy process attachment."""
+
     global WSSCRCPY_PROCESS
 
-    # 🚀 STEP 1: Spawning headless web socket streaming canvas bound to port 8834
+    # 🚀 STEP 1: Spawning headless web socket streaming canvas via clean shell pass
     print("🚀 Lifespan Initialization: Spawning background ws-scrcpy stream daemon...")
     try:
-        # ⚡ DEBUG UPDATE: Changed stdout/stderr to None to catch raw Node trace errors in docker compose logs
+        # Running via shell=True tells the OS layer to process the global compose environment variable natively
         WSSCRCPY_PROCESS = subprocess.Popen(
-            ["ws-scrcpy", "--port=8834", "--max-fps=30", "--max-size=1024", "--turn-screen-off"],
+            "node /opt/ws-scrcpy/dist/index.js",
+            shell=True,
             stdout=None,
             stderr=None
         )
-        print("🟢 ws-scrcpy live streaming mirror server spawned successfully on host interface port 8834.")
-    except FileNotFoundError:
-        print("⚠️  Warning: 'ws-scrcpy' binary not detected inside environment image hierarchy.")
+        print("🟢 ws-scrcpy live streaming mirror server spawned successfully.")
     except Exception as launch_err:
         print(f"❌ Failed to spin up the ws-scrcpy socket interface subsystem layer: {launch_err}")
 
-    # STEP 2: Deploying automated 10-minute background routine checking loops
+    # STEP 2: Deploying automated background routine checking loops
     stop_cron_signal = threading.Event()
     cron_thread = threading.Thread(target=cron_worker_loop, args=(stop_cron_signal,), daemon=True)
     cron_thread.start()
@@ -83,7 +87,6 @@ async def lifespan(app_inst: FastAPI):
         except subprocess.TimeoutExpired:
             WSSCRCPY_PROCESS.kill()
             print("💥 Force-killed unresponsive stream framework.")
-
 
 app = FastAPI(title="UAPP Web API Service", lifespan=lifespan)
 
@@ -459,7 +462,15 @@ def trigger_device_unlock(background_tasks: BackgroundTasks):
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     with open("index.html") as f:
-        return f.read()
+        html_content = f.read()
+
+    # 🚀 LIVE JAVASCRIPT INJECTION: Swaps out the hardcoded address on load
+    clean_ip = DEVICE_IP.split(":")[0]  # Extracts just "192.168.111.48"
+    modified_html = html_content.replace(
+        'const DEVICE_IP = "192.168.111.48:5555";',
+        f'const DEVICE_IP = "{DEVICE_IP}";'
+    )
+    return modified_html
 
 
 if __name__ == "__main__":
