@@ -20,19 +20,20 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git . && \
 # ==============================================================================
 FROM python:3.11-alpine
 
-# Install standard system automation assets (ADB, Node, and video rendering libs)
+# 🚀 FIX: Install standard system tools PLUS 'scrcpy' native core capture engine assets
 RUN apk add --no-cache \
     android-tools \
     nodejs \
     npm \
     ffmpeg \
     mesa-gl \
-    libusb
+    libusb \
+    scrcpy
 
 # Copy over compiled distribution folder directly from the builder stage
 COPY --from=web-builder /build/dist /usr/local/lib/node_modules/ws-scrcpy
 
-# 🚀 FIX: Enforce permissions and create a safe shell wrapper execution binary link
+# Enforce permissions and create a safe shell wrapper execution binary link
 RUN chmod +x /usr/local/lib/node_modules/ws-scrcpy/index.js && \
     echo '#!/bin/sh' > /usr/local/bin/ws-scrcpy && \
     echo 'node /usr/local/lib/node_modules/ws-scrcpy/index.js "$@"' >> /usr/local/bin/ws-scrcpy && \

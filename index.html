@@ -413,7 +413,7 @@
         consoleBox.innerHTML = '<div class="log-row"><span class="timestamp">[' + new Date().toLocaleTimeString() + ']</span> Logs cleared.</div>';
     }
 
-    // 🚀 UPDATED MOUNT ENGINE: Binds the iframe to your exact ws-scrcpy instance on port 8834
+    // 🚀 FIXED: Binds the iframe using the strict hash routing layout syntax required by NetrisTV ws-scrcpy
     function initializeLiveStream() {
         snapBtn.disabled = true;
         snapSpinner.style.display = "inline-block";
@@ -421,11 +421,12 @@
 
         // Construct the host interface URL using the browser origin dynamically pointing to port 8834
         const hostIp = window.location.hostname || "localhost";
-        const targetStreamUrl = `http://${hostIp}:8834/?action=stream&udid=${DEVICE_IP}&decoder=mse`;
+
+        // ⚡ CHANGE: Changed from `/?action=stream` to `/#!/stream` to register player canvas arguments correctly
+        const targetStreamUrl = `http://${hostIp}:8834/#!/stream?action=stream&udid=${DEVICE_IP}&decoder=mse`;
 
         streamFrame.src = targetStreamUrl;
-        
-        // Small fake listener feedback to match iframe rendering timings
+
         setTimeout(() => {
             snapBtn.disabled = false;
             snapSpinner.style.display = "none";
