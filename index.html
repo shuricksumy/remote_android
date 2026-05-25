@@ -16,6 +16,7 @@
             --secondary-hover: #374151;
             --success: #10b981;
             --danger: #ef4444;
+            --danger-hover: #dc2626;
             --border: #27272a;
         }
 
@@ -27,10 +28,9 @@
             padding: 0;
             height: 100vh;
             display: grid;
-            grid-template-columns: 1fr 1fr; /* Split screen 50/50 */
+            grid-template-columns: 1fr 1fr;
         }
 
-        /* Responsive design for smaller screens/phones */
         @media (max-width: 900px) {
             body {
                 grid-template-columns: 1fr;
@@ -39,9 +39,6 @@
             }
         }
 
-        /* ==============================================================================
-           LEFT COLUMN: SCREEN MONITOR WINDOW
-           ============================================================================== */
         .screen-monitor-panel {
             background-color: #09090b;
             border-right: 1px solid var(--border);
@@ -77,9 +74,6 @@
             background-color: #000;
         }
 
-        /* ==============================================================================
-           RIGHT COLUMN: CONTROL DASHBOARD PANEL
-           ============================================================================== */
         .control-panel {
             padding: 40px;
             overflow-y: auto;
@@ -155,6 +149,12 @@
 
         .button-group {
             display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .row-buttons {
+            display: flex;
             gap: 12px;
         }
 
@@ -179,6 +179,9 @@
 
         .btn-secondary { background-color: var(--secondary); }
         .btn-secondary:hover { background-color: var(--secondary-hover); }
+
+        .btn-danger { background-color: var(--danger); }
+        .btn-danger:hover { background-color: var(--danger-hover); }
 
         .btn:active { transform: scale(0.98); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
@@ -220,9 +223,76 @@
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ==============================================================================
+           CONFIRMATION MODAL OVERLAY STYLE
+           ============================================================================== */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1; pointer-events: auto;
+        }
+
+        .modal-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            width: 90%;
+            max-width: 380px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            transform: scale(0.95);
+            transition: transform 0.2s ease;
+        }
+
+        .modal-overlay.active .modal-card {
+            transform: scale(1);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+
+        .modal-text {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
     </style>
 </head>
 <body>
+
+<div id="rebootModal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-title">Confirm Device Reboot</div>
+        <div class="modal-text">Are you sure you want to reboot the player hardware? This will terminate active audio playback instantly.</div>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeRebootModal()">Cancel</button>
+            <button class="btn btn-danger" onclick="confirmReboot()">Yes, Reboot</button>
+        </div>
+    </div>
+</div>
 
 <div class="screen-monitor-panel">
     <div class="panel-title">📱 Live Screen Feed</div>
@@ -250,14 +320,21 @@
 
         <div class="card">
             <div class="button-group">
-                <button id="checkBtn" class="btn btn-secondary" onclick="checkStatus()">
-                    <div id="checkSpinner" class="spinner"></div>
-                    Check Status
-                </button>
+                <div class="row-buttons" style="margin-bottom: 12px;">
+                    <button id="checkBtn" class="btn btn-secondary" onclick="checkStatus()">
+                        <div id="checkSpinner" class="spinner"></div>
+                        Check Status
+                    </button>
 
-                <button id="triggerBtn" class="btn btn-primary" onclick="triggerAutomation()">
-                    <div id="triggerSpinner" class="spinner"></div>
-                    Trigger Macro
+                    <button id="triggerBtn" class="btn btn-primary" onclick="triggerAutomation()">
+                        <div id="triggerSpinner" class="spinner"></div>
+                        Trigger Macro
+                    </button>
+                </div>
+
+                <button id="rebootBtn" class="btn btn-danger" onclick="openRebootModal()">
+                    <div id="rebootSpinner" class="spinner"></div>
+                    Reboot Device
                 </button>
             </div>
         </div>
@@ -273,17 +350,21 @@
 </div>
 
 <script>
-    // Detect environment dynamically to point to API address safely
     const API_BASE_URL = window.location.origin === "null" || window.location.protocol === "file:"
-        ? "http://localhost:8833"
+        ? "http://localhost:8000"
         : window.location.origin;
 
     const statusBadge = document.getElementById('statusBadge');
     const checkBtn = document.getElementById('checkBtn');
     const triggerBtn = document.getElementById('triggerBtn');
+    const rebootBtn = document.getElementById('rebootBtn');
+
     const checkSpinner = document.getElementById('checkSpinner');
     const triggerSpinner = document.getElementById('triggerSpinner');
+    const rebootSpinner = document.getElementById('rebootSpinner');
+
     const consoleBox = document.getElementById('console');
+    const rebootModal = document.getElementById('rebootModal');
 
     function log(message, type = "info") {
         const time = new Date().toLocaleTimeString();
@@ -299,7 +380,6 @@
         consoleBox.innerHTML = '<div class="log-row"><span class="timestamp">[' + new Date().toLocaleTimeString() + ']</span> Logs cleared.</div>';
     }
 
-    // ON-DEMAND MANUALLY CONTROLLED NETWORK STATUS CHECK
     async function checkStatus() {
         checkBtn.disabled = true;
         checkSpinner.style.display = "block";
@@ -328,7 +408,6 @@
         }
     }
 
-    // ON-DEMAND MACRO EXECUTION
     async function triggerAutomation() {
         triggerBtn.disabled = true;
         triggerSpinner.style.display = "block";
@@ -348,6 +427,42 @@
                 triggerBtn.disabled = false;
                 triggerSpinner.style.display = "none";
             }, 2000);
+        }
+    }
+
+    // Modal view handlers
+    function openRebootModal() {
+        rebootModal.classList.add('active');
+    }
+
+    function closeRebootModal() {
+        rebootModal.classList.remove('active');
+    }
+
+    // Explicit network call upon approval confirmation
+    async function confirmReboot() {
+        closeRebootModal();
+        rebootBtn.disabled = true;
+        rebootSpinner.style.display = "block";
+        log("🔄 Confirmation approved. Sending hardware REBOOT directive...", "error");
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/reboot`, { method: 'POST' });
+            if (!response.ok) throw new Error('Server rejected reboot command');
+            const data = await response.json();
+
+            log(`💤 Core Message: ${data.message}`, "success");
+            log(`ℹ️ Hardware Status: ${data.detail}`);
+            statusBadge.className = "status-badge status-UNKNOWN";
+            statusBadge.innerText = "OFFLINE";
+        } catch (error) {
+            log(`❌ Reboot execution error: ${error.message}`, "error");
+        } finally {
+            // Lock out button for a while to let device drop offline safely
+            setTimeout(() => {
+                rebootBtn.disabled = false;
+                rebootSpinner.style.display = "none";
+            }, 5000);
         }
     }
 

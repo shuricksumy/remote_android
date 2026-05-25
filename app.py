@@ -1,7 +1,8 @@
+import contextlib
 import multiprocessing
 import subprocess
-import sys
 import time
+import threading
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.responses import HTMLResponse
 import uiautomator2 as u2
@@ -13,62 +14,78 @@ import upnpclient
 DEVICE_IP = "192.168.111.48:5555"
 PACKAGE_NAME = "com.extreamsd.usbaudioplayerpro"
 GLOBAL_TIMEOUT = 10.0
-
-# Name of the active UAPP renderer as seen on the network subnet
 UPNP_FRIENDLY_NAME = "MI Player"
 
-# Initialize FastAPI App
-app = FastAPI(title="UAPP Web API Service")
+
+# ==============================================================================
+# 2. LIFESPAN SYSTEM SCHEDULER
+# ==============================================================================
+def cron_worker_loop(stop_event: threading.Event):
+    """Runs a non-blocking background loop checking network state every 10 minutes."""
+    print("⏰ Periodic background cron loop initialized.")
+    counter = 0
+    while not stop_event.is_set():
+        if counter <= 0:
+            print("⏰ Cron Trigger: Initiating scheduled 10-minute automation pass...")
+            try:
+                master_automation_pipeline()
+            except Exception as e:
+                print(f"❌ Scheduled periodic pass encountered an error: {e}")
+            counter = 600  # Reset timer to 10 minutes (600 seconds)
+
+        time.sleep(1)
+        counter -= 1
+    print("🛑 Scheduled periodic background cron worker loop gracefully stopped.")
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app_inst: FastAPI):
+    """Handles startup background thread spawning and clean shutdown logic."""
+    stop_cron_signal = threading.Event()
+    cron_thread = threading.Thread(target=cron_worker_loop, args=(stop_cron_signal,), daemon=True)
+    cron_thread.start()
+
+    yield  # Web API server is active
+
+    print("🧹 FastAPI Lifespan: Shutting down daemon loops...")
+    stop_cron_signal.set()
+    cron_thread.join(timeout=3)
+
+
+app = FastAPI(title="UAPP Web API Service", lifespan=lifespan)
 
 
 # ==============================================================================
-# 2. NETWORK & DEVICE CONNECTIVITY ACTIONS
+# 3. NETWORK & ADB CONNECTIVITY ACTIONS
 # ==============================================================================
 def is_renderer_active_on_network(target_name, retries=3):
-    """
-    Scans the local network for an active UPnP renderer matching target_name.
-    Implements a multi-pass loop to combat UDP/SSDP packet drop over Wi-Fi.
-    """
+    """Scans local Wi-Fi for UPnP renderers with a multi-pass sweep for UDP stability."""
     print(f"🛰️  Network Scan: Checking if service matching '{target_name}' is alive...")
-
     for attempt in range(1, retries + 1):
         try:
-            # discover() parameters:
-            # - timeout: seconds to wait for network responses
-            # - HTTP_TIMEOUT: socket read thresholds
             devices = upnpclient.discover(timeout=2)
-
             for device in devices:
-                # Keep your debug line to see incoming traffic live
                 print(
-                    f"️⚠️ DEBUG Network Check [Attempt {attempt}]: Found active broadcast -> '{device.friendly_name}'!")
-
+                    f"⚠️ DEBUG Network Check [Attempt {attempt}]: Found active broadcast -> '{device.friendly_name}'!")
                 if target_name.lower() in device.friendly_name.lower():
                     print(f"🟢 Network Check: Confirmed online -> '{device.friendly_name}'!")
                     return True
-
         except Exception as e:
             print(f"⚠️ Network scan temporary error on pass {attempt}: {e}")
-
-        # If we didn't find it on this pass, wait a moment for the network buffer to clear
         if attempt < retries:
             time.sleep(0.5)
-
     print(f"🔴 Network Check: UPnP service was NOT detected after {retries} network sweeps.")
     return False
 
 
 def initialize_device(ip_address):
-    """Ensures raw network ADB is connected, then initializes the uiautomator2 driver."""
-    print(f"📡 Step 0: Pinging wireless ADB target at {ip_address}...")
+    """Pings raw wireless ADB node and handles driver hook attachment."""
+    print(f"📡 Hooking wireless ADB target at {ip_address}...")
     subprocess.run(f"adb connect {ip_address}", shell=True, capture_output=True)
     time.sleep(1.5)
-
     try:
         device_inst = u2.connect(ip_address)
-        print(
-            f"✅ Connection successful! Device Model: {device_inst.info.get('model', 'Unknown')}"
-        )
+        print(f"✅ Connection successful! Device Model: {device_inst.info.get('model', 'Unknown')}")
         return device_inst
     except Exception as e:
         print(f"❌ Device connection critical failure: {e}")
@@ -76,15 +93,11 @@ def initialize_device(ip_address):
 
 
 # ==============================================================================
-# 3. BACKGROUND SYSTEM DIALOG HANDLER
+# 4. MULTIPROCESSED ASYNC SYSTEM DIALOG WATCHER
 # ==============================================================================
 def background_popup_watcher(ip_address, stop_event):
-    """
-    Runs in a completely separate process. Constantly scans the
-    screen for the system 'Access USB device' dialog text.
-    """
+    """Scans the screen interface concurrently to suppress hardware access prompts."""
     print("👀 [PopupWatcher] Starting background watcher...")
-
     try:
         watcher_d = u2.connect(ip_address)
     except Exception:
@@ -92,32 +105,35 @@ def background_popup_watcher(ip_address, stop_event):
         return
 
     while not stop_event.is_set():
-        system_popup_ok = watcher_d(textMatches="(?i)(OK|Allow|Grant)")
-        access_context = watcher_d(textContains="access")
+        try:
+            system_popup_ok = watcher_d(textMatches="(?i)(OK|Allow|Grant)")
+            access_context = watcher_d(textContains="access")
 
-        if access_context.exists(timeout=0.1) and system_popup_ok.exists(timeout=0.1):
-            print("🚨 [PopupWatcher] CRITICAL POPUP DETECTED!")
+            if access_context.exists(timeout=0.1) and system_popup_ok.exists(timeout=0.1):
+                print("🚨 [PopupWatcher] CRITICAL POPUP DETECTED!")
+                always_checkbox = watcher_d(textMatches="(?i)(Always open)")
+                if always_checkbox.exists(timeout=0.2) and not always_checkbox.info.get('checked', False):
+                    print("   ☑️ Setting 'Always open' as default...")
+                    always_checkbox.click()
+                    time.sleep(0.5)
 
-            always_checkbox = watcher_d(textMatches="(?i)(Always open)")
-            if always_checkbox.exists and not always_checkbox.info.get('checked'):
-                print("   ☑️ Setting 'Always open' as default...")
-                always_checkbox.click()
-                time.sleep(0.5)
-
-            print("   👉 Clicking 'OK' to dismiss system hardware alert.")
-            system_popup_ok.click()
-            time.sleep(1)
-
+                print("   👉 Clicking 'OK' to dismiss system hardware alert.")
+                if system_popup_ok.exists(timeout=0.2):
+                    system_popup_ok.click()
+                    time.sleep(1)
+        except u2.exceptions.UiObjectNotFoundError:
+            print("⚠️ [PopupWatcher] Element became unavailable during targeted click frame. Retrying...")
+        except Exception as loop_err:
+            print(f"⚠️ [PopupWatcher] Ongoing layout sweep warning: {loop_err}")
         time.sleep(0.5)
-
     print("🛑 [PopupWatcher] Watcher process stopping.")
 
 
 # ==============================================================================
-# 4. REUSABLE AUTOMATION ACTION BLOCKS
+# 5. REUSABLE AUTOMATION ACTION BLOCKS
 # ==============================================================================
 def launch_fresh_app(device, pkg):
-    """Brings app to front if running, otherwise starts normally (doesn't wipe audio)."""
+    """Brings the player to focus safely without resetting current audio streams."""
     current_app = device.app_current()
     if current_app.get('package') == pkg:
         print(f"ℹ️ App {pkg} is already open and in focus.")
@@ -128,10 +144,10 @@ def launch_fresh_app(device, pkg):
 
 
 def start_upnp_renderer_from_drawer(device):
-    """Opens app sidebar drawer, scrolls, and hits start button."""
-    print("🍔 Step 3: Navigating app UI to start the UPnP Renderer...")
-    time.sleep(1.0)
+    """Navigates side navigation panel elements to activate streaming server."""
+    print("🍔 Toggling sidebar layout navigation...")
     press_system_back(device)
+    time.sleep(1.0)
     device.click(0.05, 0.05)
     time.sleep(1.0)
 
@@ -143,26 +159,24 @@ def start_upnp_renderer_from_drawer(device):
     if target_btn.wait(timeout=GLOBAL_TIMEOUT):
         print("🎯 Element found! Clicking 'Start UPnP renderer'...")
         target_btn.click()
+        time.sleep(1)
+        press_system_back(device)
         return True
-
     raise TimeoutError("Could not locate the 'Start UPnP renderer' button.")
 
 
+def click_app_bottom_home(device):
+    """Taps the lower application home area using fixed relative screen geometry."""
+    print("🏠 Tapping the application's bottom Home nav icon...")
+    device.click(0.11, 0.87)
+    time.sleep(1)
+    return True
+
+
 def take_test_screenshot(device, filename="test_result.png"):
-    """Saves a current frame of the screen layout for visual verification."""
+    """Saves visual reference frame data to local workspace disk directory."""
     print(f"📸 Capturing visual validation state to '{filename}'...")
     device.screenshot(filename)
-
-
-def return_to_home_page(device):
-    """Opens drawer and clicks 'Library' to return to main view."""
-    print("🏠 Navigating back to the home view (Library)...")
-    device.click(0.05, 0.05)
-    time.sleep(1.0)
-    home_btn = device(text="Library")
-    if home_btn.wait(timeout=5.0):
-        home_btn.click()
-        print("✅ Returned to Home successfully.")
 
 
 def press_system_back(device):
@@ -175,20 +189,29 @@ def press_system_home(device):
     time.sleep(1)
 
 
-def reboot_android_device(device):
+def reboot_android_device():
+    """Forces hardware power cycling using decoupled sub-shell interface calls."""
     print("🔄 Sending hardware REBOOT command to the device...")
-    device.shell("reboot")
-    print("💤 Connection dropped. Device is now restarting.")
+    try:
+        subprocess.run(f"adb -s {DEVICE_IP} reboot", shell=True, capture_output=True, timeout=5)
+        print("💤 Reboot command dispatched cleanly via raw ADB interface.")
+    except subprocess.TimeoutExpired:
+        print("💤 Raw ADB connection timed out intentionally as the hardware shut down.")
+    except Exception:
+        print("💤 Shell dropped interface attachment. System is now restarting.")
 
 
 # ==============================================================================
-# 5. CORE AUTOMATION WORKFLOW PIPELINE
+# 6. STEP-BY-STEP CONTROL AUTOMATION WORKFLOW PIPELINE
 # ==============================================================================
 def master_automation_pipeline():
-    """Runs your full original pipeline logic cleanly in the background."""
+    """Executes the macro control sequence sequentially with integrated error handlers."""
     print("\n=== STARTING ROBUST NETWORK-SMART AUTOMATION RUN ===")
 
-    # 🚀 PRIMACY CHECK
+    # --------------------------------------------------------------------------
+    # STEP 1: PRIMACY PRE-FLIGHT NETWORK CHECK
+    # --------------------------------------------------------------------------
+    # Query network state before sending commands. If online, skip macro entirely.
     if is_renderer_active_on_network(UPNP_FRIENDLY_NAME):
         print("✨ UPnP service is already running on the Wi-Fi. Script exiting cleanly!")
         print("=== AUTOMATION RUN FINISHED (SKIPPED) ===\n")
@@ -196,41 +219,64 @@ def master_automation_pipeline():
 
     print("\n🛠️ Service undetected. Initializing ADB UI workflow with background popup watcher...")
 
-    # Step 0: Hook main device connection
+    # --------------------------------------------------------------------------
+    # STEP 2: ADB CONNECTION ATTACHMENT
+    # --------------------------------------------------------------------------
+    # Initialize connection handle with hardware client.
     d = initialize_device(DEVICE_IP)
     if d is None:
         print("❌ Pipeline stopped due to connection failure.")
         return
 
-    # Start background process watcher
+    # --------------------------------------------------------------------------
+    # STEP 3: CONCURRENT SYSTEM POPUP WATCHER LAUNCH
+    # --------------------------------------------------------------------------
+    # Spawn the safe dialogue listener process in parallel to clear USB prompts.
     stop_watcher_event = multiprocessing.Event()
-    watcher_process = multiprocessing.Process(
-        target=background_popup_watcher,
-        args=(DEVICE_IP, stop_watcher_event)
-    )
+    watcher_process = multiprocessing.Process(target=background_popup_watcher, args=(DEVICE_IP, stop_watcher_event))
     watcher_process.start()
     time.sleep(1)
 
     try:
-        # Step 1: Initialize App state
+        # ----------------------------------------------------------------------
+        # STEP 4: APP LAYER INITIALIZATION
+        # ----------------------------------------------------------------------
+        # Clear external screen obstructions and open the targeted player bundle.
         press_system_home(d)
         launch_fresh_app(d, PACKAGE_NAME)
+        time.sleep(3.0)
 
-        # Step 2: Navigate UI & Trigger Feature
+        # ----------------------------------------------------------------------
+        # STEP 5: NAVIGATION MACRO ROUTINE
+        # ----------------------------------------------------------------------
+        # Engage UI layout sequences to kickstart internal streaming protocols.
         start_upnp_renderer_from_drawer(d)
+        click_app_bottom_home(d)
 
-        # Step 3: Clean up screen state
-        press_system_back(d)
-        press_system_home(d)
+        # ----------------------------------------------------------------------
+        # STEP 6: DYNAMIC ACTIVE VERIFICATION POLLING
+        # ----------------------------------------------------------------------
+        # Cycle network queries aggressively rather than using fixed sleep calls.
+        print("\n🛰️ Engaging active network polling tracker...")
+        max_wait, poll_interval, elapsed, service_verified = 10.0, 0.5, 0.0, False
 
-        # Step 4: Verification
-        print("\n⏳ Waiting 4 seconds for network service broadcast initialization...")
-        time.sleep(4)
-        if is_renderer_active_on_network(UPNP_FRIENDLY_NAME):
-            print("\n🎉 SUCCESS: All steps executed and service verified on network!")
+        while elapsed < max_wait:
+            if is_renderer_active_on_network(UPNP_FRIENDLY_NAME, retries=1):
+                service_verified = True
+                print(f"⚡ [Tracker] Service captured online after {elapsed:.1f} seconds! Breaking loop early.")
+                break
+            time.sleep(poll_interval)
+            elapsed += poll_interval
+
+        # ----------------------------------------------------------------------
+        # STEP 7: STATE CAPTURE & DISK VALIDATION
+        # ----------------------------------------------------------------------
+        # Write validation outcomes and frame dumps directly to local folder tree.
+        if service_verified:
+            print("\n🎉 SUCCESS: All steps executed and service verified active on network!")
             take_test_screenshot(d, "uapp_automation_success.png")
         else:
-            print("\n⚠️ UI macro finished, but the network service is still not broadcasting.")
+            print(f"\n⚠️ UI macro finished, but network service failed to broadcast within {max_wait}s.")
             take_test_screenshot(d, "uapp_automation_unverified_network.png")
 
     except Exception as error:
@@ -238,21 +284,23 @@ def master_automation_pipeline():
         take_test_screenshot(d, "uapp_automation_error_dump.png")
 
     finally:
+        # ----------------------------------------------------------------------
+        # STEP 8: REAPER CLEANUP
+        # ----------------------------------------------------------------------
+        # Terminate background listener workers safely to release hardware allocations.
         print("\n🧹 Shutting down background watcher process...")
         stop_watcher_event.set()
         watcher_process.join(timeout=3)
         if watcher_process.is_alive():
             watcher_process.terminate()
-
         print("=== TEST RUN PIPELINE FINISHED ===\n")
 
 
 # ==============================================================================
-# 6. HTTP API ENDPOINTS
+# 7. HTTP API ENDPOINTS
 # ==============================================================================
 @app.get("/status")
 def get_status():
-    """Quickly check network state without opening ADB."""
     active = is_renderer_active_on_network(UPNP_FRIENDLY_NAME)
     return {
         "upnp_service_active": active,
@@ -263,19 +311,33 @@ def get_status():
 
 @app.post("/trigger")
 def trigger_test(background_tasks: BackgroundTasks):
-    """Triggers the pipeline as an asynchronous background task."""
     background_tasks.add_task(master_automation_pipeline)
     return {
         "message": "Automation worker triggered",
         "detail": "Checking network. Will engage ADB interface if service is missing."
     }
 
+
+@app.post("/reboot")
+def trigger_device_reboot(background_tasks: BackgroundTasks):
+    def perform_reboot():
+        print("\n🔄 [API Request] Initiating manual device reboot hook...")
+        reboot_android_device()
+
+    background_tasks.add_task(perform_reboot)
+    return {
+        "message": "Reboot instruction successfully dispatched",
+        "detail": "The phone connection will drop momentarily as hardware cycling begins."
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     with open("index.html") as f:
         return f.read()
 
+
 if __name__ == "__main__":
     import uvicorn
-    # Runs the API server on local port 8000
+
     uvicorn.run(app, host="0.0.0.0", port=8833)
