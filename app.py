@@ -44,16 +44,17 @@ def cron_worker_loop(stop_event: threading.Event):
 @contextlib.asynccontextmanager
 async def lifespan(app_inst: FastAPI):
     """Handles startup background thread spawning and explicit ws-scrcpy process attachment."""
+
     global WSSCRCPY_PROCESS
 
     # 🚀 STEP 1: Spawning headless web socket streaming canvas bound to port 8834
     print("🚀 Lifespan Initialization: Spawning background ws-scrcpy stream daemon...")
     try:
-        # We pass explicit arguments to limit bandwidth and enforce real-time display power savings
+        # ⚡ DEBUG UPDATE: Changed stdout/stderr to None to catch raw Node trace errors in docker compose logs
         WSSCRCPY_PROCESS = subprocess.Popen(
             ["ws-scrcpy", "--port=8834", "--max-fps=30", "--max-size=1024", "--turn-screen-off"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stdout=None,
+            stderr=None
         )
         print("🟢 ws-scrcpy live streaming mirror server spawned successfully on host interface port 8834.")
     except FileNotFoundError:

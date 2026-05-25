@@ -20,7 +20,7 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git . && \
 # ==============================================================================
 FROM python:3.11-alpine
 
-# 🚀 FIX: Install standard system tools PLUS 'scrcpy' native core capture engine assets
+# Install standard system automation assets (ADB, Node, npm, and video rendering libs)
 RUN apk add --no-cache \
     android-tools \
     nodejs \
@@ -30,15 +30,16 @@ RUN apk add --no-cache \
     libusb \
     scrcpy
 
-# Copy over compiled distribution folder directly from the builder stage
+# Copy the pre-compiled distribution folder directly into a stable global path
 COPY --from=web-builder /build/dist /usr/local/lib/node_modules/ws-scrcpy
 
-# Enforce permissions and create a safe shell wrapper execution binary link
-RUN chmod +x /usr/local/lib/node_modules/ws-scrcpy/index.js && \
-    echo '#!/bin/sh' > /usr/local/bin/ws-scrcpy && \
-    echo 'node /usr/local/lib/node_modules/ws-scrcpy/index.js "$@"' >> /usr/local/bin/ws-scrcpy && \
-    chmod +x /usr/local/bin/ws-scrcpy
+WORKDIR /usr/local/lib/node_modules/ws-scrcpy
 
+# 🚀 FIX: Let npm natively link the package globally!
+# This auto-generates perfect system environment path wrappers safely.
+RUN npm link
+
+# Reset back to our core application container space
 WORKDIR /app
 
 # Install your Python FastAPI framework requirements directly inline
@@ -47,7 +48,7 @@ RUN pip install --no-cache-dir fastapi uvicorn uiautomator2 upnpclient
 # Copy over your core web application logic scripts
 COPY app.py index.html .
 
-# Expose your standard control interfaces (8833 and 8834 run on host mode anyway)
+# Expose your standard control interfaces (8833 and 8834)
 EXPOSE 8833 8834
 
 # Fire up your Python orchestrator daemon
