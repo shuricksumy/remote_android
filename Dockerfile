@@ -1,26 +1,27 @@
 # ==============================================================================
 # STAGE 1: ISOLATED WEB BUILDER INTERFACES
 # ==============================================================================
-FROM node:20-alpine AS web-builder
+# Use the exact same base image to guarantee Node.js C++ binding compatibility
+FROM python:3.11-alpine AS web-builder
 
 # Install core native dependencies required to download and compile git assets
-RUN apk add --no-cache git python3 make g++ gcc musl-dev
+RUN apk add --no-cache git make g++ gcc musl-dev nodejs npm
 
 WORKDIR /build
 
-# Clone the official repository and compile the distribution bundle locally
+# Clone the repository, compile the dist folder, and strip out bulky dev tools
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git . && \
     npm install && \
     npm run dist && \
-    cd dist && \
-    npm install --omit=dev
+    npm prune --production
 
 # ==============================================================================
 # STAGE 2: FINAL PRODUCTION PYTHON RUNTIME
 # ==============================================================================
 FROM python:3.11-alpine
 
-# Install standard system automation assets (ADB, Node, npm, and video rendering libs)
+# Install standard system automation assets (ADB, Node, and video rendering libs)
+# Notice we DO NOT install make or gcc here, keeping the image ultra-light!
 RUN apk add --no-cache \
     android-tools \
     nodejs \
@@ -30,16 +31,14 @@ RUN apk add --no-cache \
     libusb \
     scrcpy
 
-# Copy over compiled distribution folder directly from the builder stage
-COPY --from=web-builder /build/dist /usr/local/lib/ws-scrcpy-dist
+# Copy the completely compiled project safely to /opt (bypassing npm install entirely)
+COPY --from=web-builder /build /opt/ws-scrcpy
 
-WORKDIR /usr/local/lib/ws-scrcpy-dist
+# Create a clean, direct execution wrapper link that doesn't trigger C++ rebuilds
+RUN echo '#!/bin/sh' > /usr/local/bin/ws-scrcpy && \
+    echo 'node /opt/ws-scrcpy/dist/index.js "$@"' >> /usr/local/bin/ws-scrcpy && \
+    chmod +x /usr/local/bin/ws-scrcpy
 
-# 🚀 FIX: Install the compiled folder directory globally via npm native layout
-# This sets up perfect global binary symlinks and pathing maps instantly
-RUN npm install -g .
-
-# Reset back to our core application container space
 WORKDIR /app
 
 # Install your Python FastAPI framework requirements directly inline
