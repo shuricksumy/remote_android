@@ -211,7 +211,6 @@ def master_automation_pipeline():
     # --------------------------------------------------------------------------
     # STEP 1: PRIMACY PRE-FLIGHT NETWORK CHECK
     # --------------------------------------------------------------------------
-    # Query network state before sending commands. If online, skip macro entirely.
     if is_renderer_active_on_network(UPNP_FRIENDLY_NAME):
         print("✨ UPnP service is already running on the Wi-Fi. Script exiting cleanly!")
         print("=== AUTOMATION RUN FINISHED (SKIPPED) ===\n")
@@ -222,7 +221,6 @@ def master_automation_pipeline():
     # --------------------------------------------------------------------------
     # STEP 2: ADB CONNECTION ATTACHMENT
     # --------------------------------------------------------------------------
-    # Initialize connection handle with hardware client.
     d = initialize_device(DEVICE_IP)
     if d is None:
         print("❌ Pipeline stopped due to connection failure.")
@@ -231,7 +229,6 @@ def master_automation_pipeline():
     # --------------------------------------------------------------------------
     # STEP 3: CONCURRENT SYSTEM POPUP WATCHER LAUNCH
     # --------------------------------------------------------------------------
-    # Spawn the safe dialogue listener process in parallel to clear USB prompts.
     stop_watcher_event = multiprocessing.Event()
     watcher_process = multiprocessing.Process(target=background_popup_watcher, args=(DEVICE_IP, stop_watcher_event))
     watcher_process.start()
@@ -239,9 +236,21 @@ def master_automation_pipeline():
 
     try:
         # ----------------------------------------------------------------------
-        # STEP 4: APP LAYER INITIALIZATION
+        # STEP 4: APP LAYER INITIALIZATION & CONDITIONAL DISPLAY UNLOCK
         # ----------------------------------------------------------------------
-        # Clear external screen obstructions and open the targeted player bundle.
+        print("\n🔒 [Pre-Flight] Checking hardware screen power state...")
+        if not d.info.get("screenOn", False):
+            print("💤 Display is currently asleep. Simulating power key wake event...")
+            d.press("power")
+            time.sleep(1.0)
+
+            print("🔓 Dismissing lock screen layer via upward drag gesture swipe...")
+            d.swipe(0.5, 0.8, 0.5, 0.2, duration=0.3)
+            time.sleep(1.0)
+        else:
+            print("🟢 Display is already illuminated and awake. Continuing execution bypass...")
+
+        # Clear external screen obstructions and open the targeted player bundle
         press_system_home(d)
         launch_fresh_app(d, PACKAGE_NAME)
         time.sleep(3.0)
@@ -249,14 +258,12 @@ def master_automation_pipeline():
         # ----------------------------------------------------------------------
         # STEP 5: NAVIGATION MACRO ROUTINE
         # ----------------------------------------------------------------------
-        # Engage UI layout sequences to kickstart internal streaming protocols.
         start_upnp_renderer_from_drawer(d)
         click_app_bottom_home(d)
 
         # ----------------------------------------------------------------------
         # STEP 6: DYNAMIC ACTIVE VERIFICATION POLLING
         # ----------------------------------------------------------------------
-        # Cycle network queries aggressively rather than using fixed sleep calls.
         print("\n🛰️ Engaging active network polling tracker...")
         max_wait, poll_interval, elapsed, service_verified = 10.0, 0.5, 0.0, False
 
@@ -271,7 +278,6 @@ def master_automation_pipeline():
         # ----------------------------------------------------------------------
         # STEP 7: STATE CAPTURE & DISK VALIDATION
         # ----------------------------------------------------------------------
-        # Write validation outcomes and frame dumps directly to local folder tree.
         if service_verified:
             print("\n🎉 SUCCESS: All steps executed and service verified active on network!")
             take_test_screenshot(d, "uapp_automation_success.png")
@@ -287,12 +293,6 @@ def master_automation_pipeline():
         # ----------------------------------------------------------------------
         # STEP 8: REAPER CLEANUP
         # ----------------------------------------------------------------------
-
-        # 🚀 ADDED: Put the display to sleep immediately after finalizing clicks
-        print("💤 Macro sequence completed. Turning screen off...")
-        d.screen_off()
-
-        # Terminate background listener workers safely to release hardware allocations.
         print("\n🧹 Shutting down background watcher process...")
         stop_watcher_event.set()
         watcher_process.join(timeout=3)
@@ -335,6 +335,7 @@ def trigger_device_reboot(background_tasks: BackgroundTasks):
         "detail": "The phone connection will drop momentarily as hardware cycling begins."
     }
 
+
 @app.get("/screenshot")
 def get_live_screenshot():
     """Captures a real-time static frame from the phone and transmits it to the UI client."""
@@ -356,7 +357,7 @@ def trigger_device_lock(background_tasks: BackgroundTasks):
         d_inst = initialize_device(DEVICE_IP)
         if d_inst:
             print("🔒 Sending system power key event (KeyCode 26)...")
-            d_inst.press("power")  # Simulates physical power button tap
+            d_inst.press("power")
         else:
             print("❌ [API Request] Lock action aborted: Could not establish ADB bridge link.")
 
@@ -365,6 +366,7 @@ def trigger_device_lock(background_tasks: BackgroundTasks):
         "message": "Screen toggle instruction successfully dispatched",
         "detail": "Power key state signal sent over ADB interface layer."
     }
+
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
