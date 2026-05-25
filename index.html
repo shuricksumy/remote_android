@@ -320,14 +320,19 @@
     </div>
 
     <div class="action-footer-row">
-        <button id="lockBtn" class="btn btn-secondary btn-flex" style="color: var(--text-muted);" onclick="toggleLockScreen()">
+        <button id="unlockBtn" class="btn btn-secondary btn-flex" style="color: var(--text-muted);" onclick="executeDeviceUnlock()">
+            <div id="unlockSpinner" class="spinner"></div>
+            🔓 Unlock
+        </button>
+
+        <button id="lockBtn" class="btn btn-secondary btn-flex" style="color: var(--text-muted);" onclick="executeDeviceLock()">
             <div id="lockSpinner" class="spinner"></div>
-            🔒 Lock / Unlock Screen
+            🔒 Lock
         </button>
 
         <button id="snapBtn" class="btn btn-secondary btn-flex" onclick="refreshScreenshot()">
             <div id="snapSpinner" class="spinner"></div>
-            📸 Refresh Viewport
+            📸 Refresh
         </button>
     </div>
 </div>
@@ -391,12 +396,14 @@
     const rebootBtn = document.getElementById('rebootBtn');
     const snapBtn = document.getElementById('snapBtn');
     const lockBtn = document.getElementById('lockBtn');
+    const unlockBtn = document.getElementById('unlockBtn');
 
     const checkSpinner = document.getElementById('checkSpinner');
     const triggerSpinner = document.getElementById('triggerSpinner');
     const rebootSpinner = document.getElementById('rebootSpinner');
     const snapSpinner = document.getElementById('snapSpinner');
     const lockSpinner = document.getElementById('lockSpinner');
+    const unlockSpinner = document.getElementById('unlockSpinner');
 
     const consoleBox = document.getElementById('console');
     const rebootModal = document.getElementById('rebootModal');
@@ -458,7 +465,7 @@
             statusBadge.innerText = data.status === "RUNNING" ? "ACTIVE" : "OFFLINE";
 
             if (data.status === "RUNNING") {
-                log("🟢 [Tracker] Service captured online after 1 seconds! Breaking loop early.", "success");
+                log("🟢 [Tracker] Service captured online! Media renderer verified active.", "success");
             } else {
                 log("🔴 Network Scan Result: Service not found on network stack.", "error");
             }
@@ -494,21 +501,39 @@
         }
     }
 
-    async function toggleLockScreen() {
+    async function executeDeviceLock() {
         lockBtn.disabled = true;
         lockSpinner.style.display = "inline-block";
-        log("🔒 Sending power key event to toggle screen state...");
+        log("🔒 Sending explicit LOCK instruction to target device...");
 
         try {
             const response = await fetch(`${API_BASE_URL}/lock`, { method: 'POST' });
-            if (!response.ok) throw new Error('API server rejected the lock command');
+            if (!response.ok) throw new Error('API server rejected the lock layout payload');
             const data = await response.json();
             log(`🔒 Success: ${data.message}`, "success");
         } catch (error) {
-            log(`❌ Lock execution failure: ${error.message}`, "error");
+            log(`❌ Lock configuration failure: ${error.message}`, "error");
         } finally {
             lockBtn.disabled = false;
             lockSpinner.style.display = "none";
+        }
+    }
+
+    async function executeDeviceUnlock() {
+        unlockBtn.disabled = true;
+        unlockSpinner.style.display = "inline-block";
+        log("🔓 Sending explicit UNLOCK and wake instruction to target device...");
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/unlock`, { method: 'POST' });
+            if (!response.ok) throw new Error('API server rejected the unlock layout payload');
+            const data = await response.json();
+            log(`🔓 Success: ${data.message}`, "success");
+        } catch (error) {
+            log(`❌ Unlock configuration failure: ${error.message}`, "error");
+        } finally {
+            unlockBtn.disabled = false;
+            unlockSpinner.style.display = "none";
         }
     }
 

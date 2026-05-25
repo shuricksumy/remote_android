@@ -59,22 +59,21 @@ app = FastAPI(title="UAPP Web API Service", lifespan=lifespan)
 # 3. NETWORK & ADB CONNECTIVITY ACTIONS
 # ==============================================================================
 def is_renderer_active_on_network(target_name, retries=3):
-    """Scans local Wi-Fi for UPnP renderers with a multi-pass sweep for UDP stability."""
-    print(f"🛰️  Network Scan: Checking if service matching '{target_name}' is alive...")
+    """Scans local Wi-Fi for UPnP renderers using standard multicast sweeps."""
+    print(f"🛰️  Multicast Network Scan: Running network discovery sweep...")
     for attempt in range(1, retries + 1):
         try:
-            devices = upnpclient.discover(timeout=2)
+            devices = upnpclient.discover(timeout=1.5)
             for device in devices:
                 print(
                     f"⚠️ DEBUG Network Check [Attempt {attempt}]: Found active broadcast -> '{device.friendly_name}'!")
                 if target_name.lower() in device.friendly_name.lower():
-                    print(f"🟢 Network Check: Confirmed online -> '{device.friendly_name}'!")
+                    print(f"🟢 Broadcast Check: Confirmed online -> '{device.friendly_name}'!")
                     return True
         except Exception as e:
-            print(f"⚠️ Network scan temporary error on pass {attempt}: {e}")
+            print(f"⚠️ Network scan temporary warning on pass {attempt}: {e}")
         if attempt < retries:
-            time.sleep(0.5)
-    print(f"🔴 Network Check: UPnP service was NOT detected after {retries} network sweeps.")
+            time.sleep(0.3)
     return False
 
 
@@ -209,25 +208,42 @@ def master_automation_pipeline():
     print("\n=== STARTING ROBUST NETWORK-SMART AUTOMATION RUN ===")
 
     # --------------------------------------------------------------------------
-    # STEP 1: PRIMACY PRE-FLIGHT NETWORK CHECK
-    # --------------------------------------------------------------------------
-    if is_renderer_active_on_network(UPNP_FRIENDLY_NAME):
-        print("✨ UPnP service is already running on the Wi-Fi. Script exiting cleanly!")
-        print("=== AUTOMATION RUN FINISHED (SKIPPED) ===\n")
-        return
-
-    print("\n🛠️ Service undetected. Initializing ADB UI workflow with background popup watcher...")
-
-    # --------------------------------------------------------------------------
-    # STEP 2: ADB CONNECTION ATTACHMENT
+    # STEP 1: ADB CONNECTION ATTACHMENT
     # --------------------------------------------------------------------------
     d = initialize_device(DEVICE_IP)
     if d is None:
         print("❌ Pipeline stopped due to connection failure.")
         return
 
+    # Track screen status so we know whether to put it back to sleep at the very end
+    started_asleep = not d.info.get("screenOn", False)
+
     # --------------------------------------------------------------------------
-    # STEP 3: CONCURRENT SYSTEM POPUP WATCHER LAUNCH
+    # STEP 2: MANDATORY PRE-FLIGHT AWAKE STRATEGY
+    # --------------------------------------------------------------------------
+    if started_asleep:
+        print("💤 Display is currently asleep. Waking up screen layout for verification...")
+        d.press("power")
+        time.sleep(1.0)
+        print("🔓 Dismissing lock screen layer via swipe gesture...")
+        d.swipe(0.5, 0.8, 0.5, 0.2, duration=0.3)
+        time.sleep(1.5)
+
+    # --------------------------------------------------------------------------
+    # STEP 3: PRIMACY RUNNING SERVICE SCAN
+    # --------------------------------------------------------------------------
+    if is_renderer_active_on_network(UPNP_FRIENDLY_NAME):
+        print("✨ UPnP service is already running on the Wi-Fi. Script exiting cleanly!")
+        if started_asleep:
+            print("💤 Locking screen back to original sleep configuration...")
+            d.press("power")
+        print("=== AUTOMATION RUN FINISHED (SKIPPED) ===\n")
+        return
+
+    print("\n🛠️ Service undetected. Initializing UI macro loop sequence...")
+
+    # --------------------------------------------------------------------------
+    # STEP 4: CONCURRENT SYSTEM POPUP WATCHER LAUNCH
     # --------------------------------------------------------------------------
     stop_watcher_event = multiprocessing.Event()
     watcher_process = multiprocessing.Process(target=background_popup_watcher, args=(DEVICE_IP, stop_watcher_event))
@@ -236,33 +252,20 @@ def master_automation_pipeline():
 
     try:
         # ----------------------------------------------------------------------
-        # STEP 4: APP LAYER INITIALIZATION & CONDITIONAL DISPLAY UNLOCK
+        # STEP 5: APP LAYER INITIALIZATION
         # ----------------------------------------------------------------------
-        print("\n🔒 [Pre-Flight] Checking hardware screen power state...")
-        if not d.info.get("screenOn", False):
-            print("💤 Display is currently asleep. Simulating power key wake event...")
-            d.press("power")
-            time.sleep(1.0)
-
-            print("🔓 Dismissing lock screen layer via upward drag gesture swipe...")
-            d.swipe(0.5, 0.8, 0.5, 0.2, duration=0.3)
-            time.sleep(1.0)
-        else:
-            print("🟢 Display is already illuminated and awake. Continuing execution bypass...")
-
-        # Clear external screen obstructions and open the targeted player bundle
         press_system_home(d)
         launch_fresh_app(d, PACKAGE_NAME)
         time.sleep(3.0)
 
         # ----------------------------------------------------------------------
-        # STEP 5: NAVIGATION MACRO ROUTINE
+        # STEP 6: NAVIGATION MACRO ROUTINE
         # ----------------------------------------------------------------------
         start_upnp_renderer_from_drawer(d)
         click_app_bottom_home(d)
 
         # ----------------------------------------------------------------------
-        # STEP 6: DYNAMIC ACTIVE VERIFICATION POLLING
+        # STEP 7: DYNAMIC ACTIVE VERIFICATION POLLING
         # ----------------------------------------------------------------------
         print("\n🛰️ Engaging active network polling tracker...")
         max_wait, poll_interval, elapsed, service_verified = 10.0, 0.5, 0.0, False
@@ -276,7 +279,7 @@ def master_automation_pipeline():
             elapsed += poll_interval
 
         # ----------------------------------------------------------------------
-        # STEP 7: STATE CAPTURE & DISK VALIDATION
+        # STEP 8: STATE CAPTURE & DISK VALIDATION
         # ----------------------------------------------------------------------
         if service_verified:
             print("\n🎉 SUCCESS: All steps executed and service verified active on network!")
@@ -290,8 +293,12 @@ def master_automation_pipeline():
         take_test_screenshot(d, "uapp_automation_error_dump.png")
 
     finally:
+        if started_asleep:
+            print("💤 Locking screen back to original sleep configuration...")
+            d.press("power")
+
         # ----------------------------------------------------------------------
-        # STEP 8: REAPER CLEANUP
+        # STEP 9: REAPER CLEANUP
         # ----------------------------------------------------------------------
         print("\n🧹 Shutting down background watcher process...")
         stop_watcher_event.set()
@@ -306,7 +313,26 @@ def master_automation_pipeline():
 # ==============================================================================
 @app.get("/status")
 def get_status():
+    """Wakes the network table up if phone is sleeping, checks status, then restores sleep state."""
+    d_inst = initialize_device(DEVICE_IP)
+    if not d_inst:
+        return {"upnp_service_active": False, "friendly_name_target": UPNP_FRIENDLY_NAME, "status": "STOPPED"}
+
+    started_asleep = not d_inst.info.get("screenOn", False)
+
+    if started_asleep:
+        print("💤 [API Status] Screen is dark. Temporarily waking device to refresh routing table...")
+        d_inst.press("power")
+        time.sleep(1.0)
+        d_inst.swipe(0.5, 0.8, 0.5, 0.2, duration=0.3)
+        time.sleep(1.5)
+
     active = is_renderer_active_on_network(UPNP_FRIENDLY_NAME)
+
+    if started_asleep:
+        print("💤 [API Status] Restoring dark screen sleep configuration...")
+        d_inst.press("power")
+
     return {
         "upnp_service_active": active,
         "friendly_name_target": UPNP_FRIENDLY_NAME,
@@ -319,7 +345,7 @@ def trigger_test(background_tasks: BackgroundTasks):
     background_tasks.add_task(master_automation_pipeline)
     return {
         "message": "Automation worker triggered",
-        "detail": "Checking network. Will engage ADB interface if service is missing."
+        "detail": "Engaging secure wake, check, and restore execution loop."
     }
 
 
@@ -350,21 +376,50 @@ def get_live_screenshot():
 
 @app.post("/lock")
 def trigger_device_lock(background_tasks: BackgroundTasks):
-    """Simulates pressing the physical power button to toggle or lock the screen."""
+    """Guarantees the screen is locked/turned off. Only hits the power key if screen is ON."""
 
     def perform_lock():
         print("\n🔒 [API Request] Initiating manual device screen lock hook...")
         d_inst = initialize_device(DEVICE_IP)
         if d_inst:
-            print("🔒 Sending system power key event (KeyCode 26)...")
-            d_inst.press("power")
+            if d_inst.info.get("screenOn", True):
+                print("🔒 Screen is currently ON. Sending power key event (KeyCode 26) to lock...")
+                d_inst.press("power")
+            else:
+                print("ℹ️ Screen is already dark and locked. Command skipped to prevent toggling.")
         else:
             print("❌ [API Request] Lock action aborted: Could not establish ADB bridge link.")
 
     background_tasks.add_task(perform_lock)
     return {
-        "message": "Screen toggle instruction successfully dispatched",
-        "detail": "Power key state signal sent over ADB interface layer."
+        "message": "Lock instruction successfully processed",
+        "detail": "Display validation pass dispatched over ADB interface layer."
+    }
+
+
+@app.post("/unlock")
+def trigger_device_unlock(background_tasks: BackgroundTasks):
+    """Guarantees the screen is turned on and unlocked. Only hits power and swipe if screen is OFF."""
+
+    def perform_unlock():
+        print("\n🔓 [API Request] Initiating manual device screen unlock hook...")
+        d_inst = initialize_device(DEVICE_IP)
+        if d_inst:
+            if not d_inst.info.get("screenOn", False):
+                print("💤 Screen is dark. Sending power key event to wake device...")
+                d_inst.press("power")
+                time.sleep(1.0)
+                print("🔓 Dismissing lock screen layer via swipe...")
+                d_inst.swipe(0.5, 0.8, 0.5, 0.2, duration=0.3)
+            else:
+                print("ℹ️ Screen is already illuminated and awake. Command skipped to prevent toggling.")
+        else:
+            print("❌ [API Request] Unlock action aborted: Could not establish ADB bridge link.")
+
+    background_tasks.add_task(perform_unlock)
+    return {
+        "message": "Unlock instruction successfully processed",
+        "detail": "Wake and drag gesture pass dispatched over ADB interface layer."
     }
 
 
