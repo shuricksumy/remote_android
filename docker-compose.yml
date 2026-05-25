@@ -9,3 +9,5 @@ services:
     restart: unless-stopped
     volumes:
       - ./adb-keys:/root/.android
+    environment:
+      - PYTHONUNBUFFERED=1

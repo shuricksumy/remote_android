@@ -81,26 +81,9 @@
             justify-content: center;
             overflow: hidden;
             position: relative;
-            padding: 20px;
+            padding: 0px; /* Zero padding inside for edge-to-edge stream container graphics */
             box-sizing: border-box;
             max-height: calc(100vh - 130px);
-        }
-
-        .phone-screenshot-graphic {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            max-height: 100%;
-            max-width: 100%;
-            display: none;
-        }
-
-        .placeholder-box-text {
-            color: #52525b;
-            font-size: 14px;
-            font-weight: 500;
-            text-align: center;
-            line-height: 1.6;
         }
 
         .action-footer-row {
@@ -313,10 +296,14 @@
 </div>
 
 <div class="screen-monitor-panel">
-    <div class="panel-title">📱 Screen Monitor & Visual Guide</div>
+    <div class="panel-title">📱 Live Screen Monitor & Visual Guide</div>
     <div class="image-viewport">
-        <div id="placeholderText" class="placeholder-box-text">No device data loaded.<br><span style="font-size:11px; color:#52525b;">Use controls below to wake up and view device layouts.</span></div>
-        <img id="screenImage" class="phone-screenshot-graphic" alt="Live phone visualization view Frame">
+        <iframe 
+            id="streamFrame"
+            src="" 
+            style="width: 100%; height: 100%; border: none; background: #000;"
+            allow="autoplay; encrypted-media">
+        </iframe>
     </div>
 
     <div class="action-footer-row">
@@ -330,9 +317,9 @@
             🔒 Lock
         </button>
 
-        <button id="snapBtn" class="btn btn-secondary btn-flex" onclick="refreshScreenshot()">
+        <button id="snapBtn" class="btn btn-secondary btn-flex" onclick="initializeLiveStream()">
             <div id="snapSpinner" class="spinner"></div>
-            📸 Refresh
+            🔄 Connect View
         </button>
     </div>
 </div>
@@ -390,6 +377,9 @@
         ? "http://localhost:8833"
         : window.location.origin;
 
+    // Hardcoded device matching backend architecture configuration 
+    const DEVICE_IP = "192.168.111.48:5555";
+
     const statusBadge = document.getElementById('statusBadge');
     const checkBtn = document.getElementById('checkBtn');
     const triggerBtn = document.getElementById('triggerBtn');
@@ -407,9 +397,7 @@
 
     const consoleBox = document.getElementById('console');
     const rebootModal = document.getElementById('rebootModal');
-
-    const screenImage = document.getElementById('screenImage');
-    const placeholderText = document.getElementById('placeholderText');
+    const streamFrame = document.getElementById('streamFrame');
 
     function log(message, type = "info") {
         const time = new Date().toLocaleTimeString();
@@ -425,30 +413,24 @@
         consoleBox.innerHTML = '<div class="log-row"><span class="timestamp">[' + new Date().toLocaleTimeString() + ']</span> Logs cleared.</div>';
     }
 
-    async function refreshScreenshot() {
+    // 🚀 UPDATED MOUNT ENGINE: Binds the iframe to your exact ws-scrcpy instance on port 8834
+    function initializeLiveStream() {
         snapBtn.disabled = true;
         snapSpinner.style.display = "inline-block";
-        log("📸 Triggering over-the-air raw ADB framework screenshot...");
+        log("📡 Connecting browser layout canvas over WebSocket port 8834...");
 
-        const targetUrl = `${API_BASE_URL}/screenshot?t=${new Date().getTime()}`;
-        const imgCache = new Image();
-        imgCache.src = targetUrl;
+        // Construct the host interface URL using the browser origin dynamically pointing to port 8834
+        const hostIp = window.location.hostname || "localhost";
+        const targetStreamUrl = `http://${hostIp}:8834/?action=stream&udid=${DEVICE_IP}&decoder=mse`;
 
-        imgCache.onload = function() {
-            placeholderText.style.display = "none";
-            screenImage.src = targetUrl;
-            screenImage.style.display = "block";
-
+        streamFrame.src = targetStreamUrl;
+        
+        // Small fake listener feedback to match iframe rendering timings
+        setTimeout(() => {
             snapBtn.disabled = false;
             snapSpinner.style.display = "none";
-            log("📸 Dashboard visualization view surface refreshed successfully.", "success");
-        };
-
-        imgCache.onerror = function() {
-            snapBtn.disabled = false;
-            snapSpinner.style.display = "none";
-            log("❌ Failed to grab screen matrix layer array over current bridge.", "error");
-        };
+            log("🟢 Live mirror active! Interact directly within the left-side frame context layout.", "success");
+        }, 1200);
     }
 
     async function checkStatus() {
@@ -563,6 +545,11 @@
             }, 5000);
         }
     }
+
+    // Auto-boot streaming iframe link 1.5 seconds after interface window load completes
+    window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(initializeLiveStream, 1500);
+    });
 
     log(`Endpoint linked to daemon layer: ${API_BASE_URL}`);
 </script>

@@ -16,9 +16,12 @@ PACKAGE_NAME = "com.extreamsd.usbaudioplayerpro"
 GLOBAL_TIMEOUT = 10.0
 UPNP_FRIENDLY_NAME = "MI Player"
 
+# Global pointer handle to track the live websocket streamer sub-process matrix
+WSSCRCPY_PROCESS = None
+
 
 # ==============================================================================
-# 2. LIFESPAN SYSTEM SCHEDULER
+# 2. LIFESPAN SYSTEM SCHEDULER & STREAM ENGINE DISPATCHER
 # ==============================================================================
 def cron_worker_loop(stop_event: threading.Event):
     """Runs a non-blocking background loop checking network state every 10 minutes."""
@@ -40,16 +43,45 @@ def cron_worker_loop(stop_event: threading.Event):
 
 @contextlib.asynccontextmanager
 async def lifespan(app_inst: FastAPI):
-    """Handles startup background thread spawning and clean shutdown logic."""
+    """Handles startup background thread spawning and explicit ws-scrcpy process attachment."""
+    global WSSCRCPY_PROCESS
+
+    # 🚀 STEP 1: Spawning headless web socket streaming canvas bound to port 8834
+    print("🚀 Lifespan Initialization: Spawning background ws-scrcpy stream daemon...")
+    try:
+        # We pass explicit arguments to limit bandwidth and enforce real-time display power savings
+        WSSCRCPY_PROCESS = subprocess.Popen(
+            ["ws-scrcpy", "--port=8834", "--max-fps=30", "--max-size=1024", "--turn-screen-off"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        print("🟢 ws-scrcpy live streaming mirror server spawned successfully on host interface port 8834.")
+    except FileNotFoundError:
+        print("⚠️  Warning: 'ws-scrcpy' binary not detected inside environment image hierarchy.")
+    except Exception as launch_err:
+        print(f"❌ Failed to spin up the ws-scrcpy socket interface subsystem layer: {launch_err}")
+
+    # STEP 2: Deploying automated 10-minute background routine checking loops
     stop_cron_signal = threading.Event()
     cron_thread = threading.Thread(target=cron_worker_loop, args=(stop_cron_signal,), daemon=True)
     cron_thread.start()
 
-    yield  # Web API server is active
+    yield  # Web API server is active and fully bound to network sockets
 
-    print("🧹 FastAPI Lifespan: Shutting down daemon loops...")
+    # 🧹 STEP 3: Handle shutdown routines to prevent lingering background zombie workers
+    print("🧹 FastAPI Lifespan: Shutting down daemon loops and stream wrappers...")
     stop_cron_signal.set()
     cron_thread.join(timeout=3)
+
+    if WSSCRCPY_PROCESS and WSSCRCPY_PROCESS.poll() is None:
+        print("🛑 Terminating active background ws-scrcpy streaming pipe processes...")
+        WSSCRCPY_PROCESS.terminate()
+        try:
+            WSSCRCPY_PROCESS.wait(timeout=2)
+            print("✨ Mirror engine closed out clean.")
+        except subprocess.TimeoutExpired:
+            WSSCRCPY_PROCESS.kill()
+            print("💥 Force-killed unresponsive stream framework.")
 
 
 app = FastAPI(title="UAPP Web API Service", lifespan=lifespan)
