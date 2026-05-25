@@ -3,12 +3,17 @@
 # ==============================================================================
 FROM node:20-alpine AS web-builder
 
-# Install core native dependencies required to compile node-gyp assets
+# Install core native dependencies required to download and compile git assets
 RUN apk add --no-cache git python3 make g++ gcc musl-dev
 
 WORKDIR /build
-# Pull and install ws-scrcpy tools globally inside the isolated cache stage
-RUN npm install -g ws-scrcpy --unsafe-perm
+
+# Clone the official repository and compile the distribution bundle locally
+RUN git clone https://github.com/NetrisTV/ws-scrcpy.git . && \
+    npm install && \
+    npm run dist && \
+    cd dist && \
+    npm install --omit=dev
 
 # ==============================================================================
 # STAGE 2: FINAL PRODUCTION PYTHON RUNTIME
@@ -24,21 +29,22 @@ RUN apk add --no-cache \
     mesa-gl \
     libusb
 
-# Copy over compiled global node modules directly from the builder stage
-COPY --from=web-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=web-builder /usr/local/bin/ws-scrcpy /usr/local/bin/ws-scrcpy
+# Copy over compiled distribution folder directly from the builder stage
+COPY --from=web-builder /build/dist /usr/local/lib/node_modules/ws-scrcpy
+
+# Link the binary command into path so app.py can invoke it globally
+RUN ln -s /usr/local/lib/node_modules/ws-scrcpy/index.js /usr/local/bin/ws-scrcpy
 
 WORKDIR /app
 
-# Install your Python FastAPI dependencies separately to maximize layer caching
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install your Python FastAPI framework requirements directly inline
+RUN pip install --no-cache-dir fastapi uvicorn uiautomator2 upnpclient
 
 # Copy over your core web application logic scripts
 COPY app.py index.html .
 
-# Expose your ports: 8833 (FastAPI Core) and 8000 (ws-scrcpy stream socket)
-EXPOSE 8833 8000
+# Expose your standard control interfaces (8833 and 8834 run on host mode anyway)
+EXPOSE 8833 8834
 
 # Fire up your Python orchestrator daemon
 CMD ["python", "app.py"]
