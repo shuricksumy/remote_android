@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,11 +33,12 @@
             overflow: hidden;
         }
 
-        @media (max-width: 1024px) {
+        /* 🚀 RESPONSIVE UPDATE: Triggers stack layout earlier on medium screens */
+        @media (max-width: 950px) {
             body {
                 grid-template-columns: 1fr;
-                grid-template-rows: auto auto;
-                overflow: auto;
+                grid-template-rows: auto minmax(500px, auto); /* Enforces a protective minimum height on the bottom area */
+                overflow-y: auto; /* Allows smooth scrolling across the full page stack */
                 height: auto;
             }
         }
@@ -56,8 +56,12 @@
             height: 100vh;
         }
 
-        @media (max-width: 1024px) {
-            .screen-monitor-panel { height: auto; }
+        @media (max-width: 950px) {
+            .screen-monitor-panel { 
+                height: 75vh; /* Gives the live stream ample viewport focus area on mobile/tablets */
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
         }
 
         .panel-title {
@@ -72,7 +76,6 @@
             gap: 8px;
         }
 
-        /* 🚀 CLEAN LAYOUT FIX: Reverted to standard responsive box container rules */
         .image-viewport {
             flex: 1;
             background-color: #111115;
@@ -88,7 +91,12 @@
             justify-content: center;
         }
 
-        /* 🚀 CLEAN LAYOUT FIX: Reset iframe back to native clean 100% dimensions */
+        @media (max-width: 950px) {
+            .image-viewport {
+                max-height: 100%; /* Allows the video window container to scale natively inside the panel height */
+            }
+        }
+
         #streamFrame {
             width: 100%;
             height: 100%;
@@ -117,8 +125,11 @@
             height: 100vh;
         }
 
-        @media (max-width: 1024px) {
-            .control-panel { height: auto; padding: 24px; }
+        @media (max-width: 950px) {
+            .control-panel { 
+                height: auto; 
+                padding: 32px 24px; 
+            }
         }
 
         .container {
@@ -439,8 +450,6 @@
         const deviceUdid = `&udid=${cleanDeviceIp}%3A${devicePort}`;
         const playerType = `&player=mse`;
         
-        // 🚀 THE NATIVE SOLUTION: Appending '&fit=true' tells the internal ws-scrcpy script to 
-        // scale the player canvas perfectly to fill up 100% of the viewport height natively!
         const wsTunnel = `&ws=ws%3A%2F%2F${hostIp}%3A${targetPort}%2F%3Faction%3Dproxy-adb%26remote%3Dtcp%253A${proxyPort}%26udid%3D${cleanDeviceIp}%253A${devicePort}&fit=true`;
 
         const targetStreamUrl = `http://${hostIp}:${targetPort}/${baseHash}${deviceUdid}${playerType}${wsTunnel}`;
