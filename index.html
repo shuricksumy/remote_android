@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UAPP Renderer Dashboard & Screen Monitor</title>
+    <title>UAPP Renderer Dashboard</title>
     <style>
         :root {
             --bg-color: #0f0f12;
@@ -12,8 +12,8 @@
             --text-muted: #9ca3af;
             --primary: #2563eb;
             --primary-hover: #1d4ed8;
-            --secondary: #4b5563;
-            --secondary-hover: #374151;
+            --secondary: #27272a;
+            --secondary-hover: #3f3f46;
             --success: #10b981;
             --danger: #ef4444;
             --danger-hover: #dc2626;
@@ -28,58 +28,102 @@
             padding: 0;
             height: 100vh;
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1.1fr 0.9fr; /* Balanced split view */
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1024px) {
             body {
                 grid-template-columns: 1fr;
-                grid-template-rows: 60vh 40vh;
+                grid-template-rows: auto auto;
+                overflow: auto;
                 height: auto;
             }
         }
 
+        /* ==============================================================================
+           LEFT COLUMN: SMART RESPONSIVE MONITOR VIEWPORT
+           ============================================================================== */
         .screen-monitor-panel {
             background-color: #09090b;
             border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            padding: 20px;
+            padding: 24px;
             box-sizing: border-box;
-            height: 100%;
+            height: 100vh;
+        }
+
+        @media (max-width: 1024px) {
+            .screen-monitor-panel { height: auto; }
         }
 
         .panel-title {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             color: var(--text-muted);
-            margin-bottom: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.8px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .iframe-container {
+        .image-viewport {
             flex: 1;
-            background-color: #000;
+            background-color: #000000;
             border-radius: 12px;
             border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
             overflow: hidden;
             position: relative;
+            padding: 20px;
+            box-sizing: border-box;
+            max-height: calc(100vh - 130px);
         }
 
-        .phone-frame {
+        .phone-screenshot-graphic {
             width: 100%;
             height: 100%;
-            border: none;
-            background-color: #000;
+            object-fit: contain;
+            max-height: 100%;
+            max-width: 100%;
+            display: none;
         }
 
+        .placeholder-box-text {
+            color: #52525b;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .action-footer-row {
+            margin-top: 16px;
+            display: flex;
+            gap: 12px;
+        }
+
+        /* ==============================================================================
+           RIGHT COLUMN: CONTROL PANEL DASHBOARD
+           ============================================================================== */
         .control-panel {
             padding: 40px;
             overflow-y: auto;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            align-items: center;
             box-sizing: border-box;
+            height: 100vh;
+        }
+
+        @media (max-width: 1024px) {
+            .control-panel { height: auto; padding: 24px; }
         }
 
         .container {
@@ -88,12 +132,11 @@
         }
 
         .header {
-            text-align: center;
             margin-bottom: 32px;
         }
 
         h1 {
-            font-size: 26px;
+            font-size: 28px;
             margin: 0 0 6px 0;
             font-weight: 700;
             letter-spacing: -0.5px;
@@ -109,8 +152,9 @@
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 24px;
-            margin-bottom: 18px;
+            margin-bottom: 20px;
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            box-sizing: border-box;
         }
 
         .status-wrapper {
@@ -132,14 +176,14 @@
         }
 
         .status-badge {
-            padding: 8px 16px;
+            padding: 6px 14px;
             border-radius: 30px;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             text-align: center;
-            min-width: 90px;
+            min-width: 85px;
             transition: all 0.2s ease;
         }
 
@@ -159,7 +203,6 @@
         }
 
         .btn {
-            flex: 1;
             color: white;
             border: none;
             padding: 14px 18px;
@@ -174,12 +217,12 @@
             transition: background-color 0.15s, transform 0.1s;
         }
 
+        .btn-full { width: 100%; }
+        .btn-flex { flex: 1; }
         .btn-primary { background-color: var(--primary); }
         .btn-primary:hover { background-color: var(--primary-hover); }
-
-        .btn-secondary { background-color: var(--secondary); }
+        .btn-secondary { background-color: var(--secondary); border: 1px solid #3f3f46; }
         .btn-secondary:hover { background-color: var(--secondary-hover); }
-
         .btn-danger { background-color: var(--danger); }
         .btn-danger:hover { background-color: var(--danger-hover); }
 
@@ -204,8 +247,9 @@
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             font-size: 12px;
             color: #38bdf8;
-            max-height: 180px;
+            max-height: 200px;
             overflow-y: auto;
+            box-sizing: border-box;
         }
 
         .log-row { margin-bottom: 6px; line-height: 1.5; }
@@ -224,9 +268,6 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ==============================================================================
-           CONFIRMATION MODAL OVERLAY STYLE
-           ============================================================================== */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -240,10 +281,7 @@
             transition: opacity 0.2s ease;
         }
 
-        .modal-overlay.active {
-            opacity: 1; pointer-events: auto;
-        }
-
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
         .modal-card {
             background-color: var(--card-bg);
             border: 1px solid var(--border);
@@ -256,29 +294,9 @@
             transform: scale(0.95);
             transition: transform 0.2s ease;
         }
-
-        .modal-overlay.active .modal-card {
-            transform: scale(1);
-        }
-
-        .modal-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            color: #fff;
-        }
-
-        .modal-text {
-            font-size: 14px;
-            color: var(--text-muted);
-            margin-bottom: 24px;
-            line-height: 1.5;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-        }
+        .modal-overlay.active .modal-card { transform: scale(1); }
+        .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 10px; color: #fff; }
+        .modal-text { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -287,32 +305,45 @@
     <div class="modal-card">
         <div class="modal-title">Confirm Device Reboot</div>
         <div class="modal-text">Are you sure you want to reboot the player hardware? This will terminate active audio playback instantly.</div>
-        <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeRebootModal()">Cancel</button>
-            <button class="btn btn-danger" onclick="confirmReboot()">Yes, Reboot</button>
+        <div class="modal-actions" style="display: flex; gap: 12px;">
+            <button class="btn btn-secondary btn-flex" onclick="closeRebootModal()">Cancel</button>
+            <button class="btn btn-danger btn-flex" onclick="confirmReboot()">Yes, Reboot</button>
         </div>
     </div>
 </div>
 
 <div class="screen-monitor-panel">
-    <div class="panel-title">📱 Live Screen Feed</div>
-    <div class="iframe-container">
-        <iframe src="http://192.168.111.111:8233/screen/#!action=stream&udid=192.168.111.48%3A5555&player=mse&ws=ws%3A%2F%2F192.168.111.111%3A8233%2Fscreen%2F%3Faction%3Dproxy-adb%26remote%3Dtcp%253A8886%26udid%3D192.168.111.48%253A5555" class="phone-frame" allowfullscreen></iframe>
+    <div class="panel-title">📱 Screen Monitor & Visual Guide</div>
+    <div class="image-viewport">
+        <div id="placeholderText" class="placeholder-box-text">No device data loaded.<br><span style="font-size:11px; color:#52525b;">Use controls below to wake up and view device layouts.</span></div>
+        <img id="screenImage" class="phone-screenshot-graphic" alt="Live phone visualization view Frame">
+    </div>
+
+    <div class="action-footer-row">
+        <button id="lockBtn" class="btn btn-secondary btn-flex" style="color: var(--text-muted);" onclick="toggleLockScreen()">
+            <div id="lockSpinner" class="spinner"></div>
+            🔒 Lock / Unlock Screen
+        </button>
+
+        <button id="snapBtn" class="btn btn-secondary btn-flex" onclick="refreshScreenshot()">
+            <div id="snapSpinner" class="spinner"></div>
+            📸 Refresh Viewport
+        </button>
     </div>
 </div>
 
 <div class="control-panel">
     <div class="container">
         <div class="header">
-            <h1>Renderer Control</h1>
-            <div class="subtitle">On-demand media network manager</div>
+            <h1>UAPP Renderer Control</h1>
+            <div class="subtitle">UAPP renderer configured to fit dashboard</div>
         </div>
 
         <div class="card">
             <div class="status-wrapper">
                 <div class="status-info">
                     <div class="status-title">Network Identity Status</div>
-                    <div style="font-size: 12px; color: var(--text-muted)">Target: MI Player</div>
+                    <div style="font-size: 14px; font-weight:600; color: #fff; margin-top:2px;">MI Player</div>
                 </div>
                 <span id="statusBadge" class="status-badge status-UNKNOWN">UNKNOWN</span>
             </div>
@@ -320,19 +351,19 @@
 
         <div class="card">
             <div class="button-group">
-                <div class="row-buttons" style="margin-bottom: 12px;">
-                    <button id="checkBtn" class="btn btn-secondary" onclick="checkStatus()">
+                <div class="row-buttons">
+                    <button id="checkBtn" class="btn btn-secondary btn-flex" onclick="checkStatus()">
                         <div id="checkSpinner" class="spinner"></div>
                         Check Status
                     </button>
 
-                    <button id="triggerBtn" class="btn btn-primary" onclick="triggerAutomation()">
+                    <button id="triggerBtn" class="btn btn-primary btn-flex" onclick="triggerAutomation()">
                         <div id="triggerSpinner" class="spinner"></div>
-                        Trigger Macro
+                        Trigger Automation
                     </button>
                 </div>
 
-                <button id="rebootBtn" class="btn btn-danger" onclick="openRebootModal()">
+                <button id="rebootBtn" class="btn btn-danger" style="margin-top: 4px;" onclick="openRebootModal()">
                     <div id="rebootSpinner" class="spinner"></div>
                     Reboot Device
                 </button>
@@ -341,7 +372,7 @@
 
         <div class="card" style="padding: 20px;">
             <div class="console-header">
-                <span>Activity Logs</span>
+                <span>Action Logs</span>
                 <span style="font-size: 11px; font-weight: normal; cursor:pointer; color: var(--primary);" onclick="clearLogs()">Clear</span>
             </div>
             <div id="console" class="console-box">Dashboard runtime connected. Waiting for command...</div>
@@ -351,20 +382,27 @@
 
 <script>
     const API_BASE_URL = window.location.origin === "null" || window.location.protocol === "file:"
-        ? "http://localhost:8000"
+        ? "http://localhost:8833"
         : window.location.origin;
 
     const statusBadge = document.getElementById('statusBadge');
     const checkBtn = document.getElementById('checkBtn');
     const triggerBtn = document.getElementById('triggerBtn');
     const rebootBtn = document.getElementById('rebootBtn');
+    const snapBtn = document.getElementById('snapBtn');
+    const lockBtn = document.getElementById('lockBtn');
 
     const checkSpinner = document.getElementById('checkSpinner');
     const triggerSpinner = document.getElementById('triggerSpinner');
     const rebootSpinner = document.getElementById('rebootSpinner');
+    const snapSpinner = document.getElementById('snapSpinner');
+    const lockSpinner = document.getElementById('lockSpinner');
 
     const consoleBox = document.getElementById('console');
     const rebootModal = document.getElementById('rebootModal');
+
+    const screenImage = document.getElementById('screenImage');
+    const placeholderText = document.getElementById('placeholderText');
 
     function log(message, type = "info") {
         const time = new Date().toLocaleTimeString();
@@ -380,9 +418,35 @@
         consoleBox.innerHTML = '<div class="log-row"><span class="timestamp">[' + new Date().toLocaleTimeString() + ']</span> Logs cleared.</div>';
     }
 
+    async function refreshScreenshot() {
+        snapBtn.disabled = true;
+        snapSpinner.style.display = "inline-block";
+        log("📸 Triggering over-the-air raw ADB framework screenshot...");
+
+        const targetUrl = `${API_BASE_URL}/screenshot?t=${new Date().getTime()}`;
+        const imgCache = new Image();
+        imgCache.src = targetUrl;
+
+        imgCache.onload = function() {
+            placeholderText.style.display = "none";
+            screenImage.src = targetUrl;
+            screenImage.style.display = "block";
+
+            snapBtn.disabled = false;
+            snapSpinner.style.display = "none";
+            log("📸 Dashboard visualization view surface refreshed successfully.", "success");
+        };
+
+        imgCache.onerror = function() {
+            snapBtn.disabled = false;
+            snapSpinner.style.display = "none";
+            log("❌ Failed to grab screen matrix layer array over current bridge.", "error");
+        };
+    }
+
     async function checkStatus() {
         checkBtn.disabled = true;
-        checkSpinner.style.display = "block";
+        checkSpinner.style.display = "inline-block";
         log("🛰️ Initiating deep multi-pass network check...");
 
         try {
@@ -394,7 +458,7 @@
             statusBadge.innerText = data.status === "RUNNING" ? "ACTIVE" : "OFFLINE";
 
             if (data.status === "RUNNING") {
-                log("🟢 Network Scan Result: 'MI Player' verified active on Wi-Fi subnet.", "success");
+                log("🟢 [Tracker] Service captured online after 1 seconds! Breaking loop early.", "success");
             } else {
                 log("🔴 Network Scan Result: Service not found on network stack.", "error");
             }
@@ -410,7 +474,7 @@
 
     async function triggerAutomation() {
         triggerBtn.disabled = true;
-        triggerSpinner.style.display = "block";
+        triggerSpinner.style.display = "inline-block";
         log("⚡ Dispatching async activation command to API...");
 
         try {
@@ -430,20 +494,31 @@
         }
     }
 
-    // Modal view handlers
-    function openRebootModal() {
-        rebootModal.classList.add('active');
+    async function toggleLockScreen() {
+        lockBtn.disabled = true;
+        lockSpinner.style.display = "inline-block";
+        log("🔒 Sending power key event to toggle screen state...");
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/lock`, { method: 'POST' });
+            if (!response.ok) throw new Error('API server rejected the lock command');
+            const data = await response.json();
+            log(`🔒 Success: ${data.message}`, "success");
+        } catch (error) {
+            log(`❌ Lock execution failure: ${error.message}`, "error");
+        } finally {
+            lockBtn.disabled = false;
+            lockSpinner.style.display = "none";
+        }
     }
 
-    function closeRebootModal() {
-        rebootModal.classList.remove('active');
-    }
+    function openRebootModal() { rebootModal.classList.add('active'); }
+    function closeRebootModal() { rebootModal.classList.remove('active'); }
 
-    // Explicit network call upon approval confirmation
     async function confirmReboot() {
         closeRebootModal();
         rebootBtn.disabled = true;
-        rebootSpinner.style.display = "block";
+        rebootSpinner.style.display = "inline-block";
         log("🔄 Confirmation approved. Sending hardware REBOOT directive...", "error");
 
         try {
@@ -452,13 +527,11 @@
             const data = await response.json();
 
             log(`💤 Core Message: ${data.message}`, "success");
-            log(`ℹ️ Hardware Status: ${data.detail}`);
             statusBadge.className = "status-badge status-UNKNOWN";
             statusBadge.innerText = "OFFLINE";
         } catch (error) {
             log(`❌ Reboot execution error: ${error.message}`, "error");
         } finally {
-            // Lock out button for a while to let device drop offline safely
             setTimeout(() => {
                 rebootBtn.disabled = false;
                 rebootSpinner.style.display = "none";

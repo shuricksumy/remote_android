@@ -4,7 +4,7 @@ import subprocess
 import time
 import threading
 from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 import uiautomator2 as u2
 import upnpclient
 
@@ -335,6 +335,36 @@ def trigger_device_reboot(background_tasks: BackgroundTasks):
         "detail": "The phone connection will drop momentarily as hardware cycling begins."
     }
 
+@app.get("/screenshot")
+def get_live_screenshot():
+    """Captures a real-time static frame from the phone and transmits it to the UI client."""
+    print("📸 [API Request] Capturing dynamic workspace screenshot for browser dashboard...")
+    d_inst = initialize_device(DEVICE_IP)
+    if d_inst:
+        filename = "live_panel_feed.png"
+        d_inst.screenshot(filename)
+        return FileResponse(filename, media_type="image/png")
+    return {"error": "Could not connect to device over ADB to generate frame profile."}
+
+
+@app.post("/lock")
+def trigger_device_lock(background_tasks: BackgroundTasks):
+    """Simulates pressing the physical power button to toggle or lock the screen."""
+
+    def perform_lock():
+        print("\n🔒 [API Request] Initiating manual device screen lock hook...")
+        d_inst = initialize_device(DEVICE_IP)
+        if d_inst:
+            print("🔒 Sending system power key event (KeyCode 26)...")
+            d_inst.press("power")  # Simulates physical power button tap
+        else:
+            print("❌ [API Request] Lock action aborted: Could not establish ADB bridge link.")
+
+    background_tasks.add_task(perform_lock)
+    return {
+        "message": "Screen toggle instruction successfully dispatched",
+        "detail": "Power key state signal sent over ADB interface layer."
+    }
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
