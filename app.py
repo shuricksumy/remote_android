@@ -287,6 +287,11 @@ def master_automation_pipeline():
         # ----------------------------------------------------------------------
         # STEP 8: REAPER CLEANUP
         # ----------------------------------------------------------------------
+
+        # 🚀 ADDED: Put the display to sleep immediately after finalizing clicks
+        print("💤 Macro sequence completed. Turning screen off...")
+        d.screen_off()
+
         # Terminate background listener workers safely to release hardware allocations.
         print("\n🧹 Shutting down background watcher process...")
         stop_watcher_event.set()
