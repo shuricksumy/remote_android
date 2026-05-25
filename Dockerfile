@@ -30,14 +30,14 @@ RUN apk add --no-cache \
     libusb \
     scrcpy
 
-# Copy the pre-compiled distribution folder directly into a stable global path
-COPY --from=web-builder /build/dist /usr/local/lib/node_modules/ws-scrcpy
+# Copy over compiled distribution folder directly from the builder stage
+COPY --from=web-builder /build/dist /usr/local/lib/ws-scrcpy-dist
 
-WORKDIR /usr/local/lib/node_modules/ws-scrcpy
+WORKDIR /usr/local/lib/ws-scrcpy-dist
 
-# 🚀 FIX: Let npm natively link the package globally!
-# This auto-generates perfect system environment path wrappers safely.
-RUN npm link
+# 🚀 FIX: Install the compiled folder directory globally via npm native layout
+# This sets up perfect global binary symlinks and pathing maps instantly
+RUN npm install -g .
 
 # Reset back to our core application container space
 WORKDIR /app
@@ -48,7 +48,7 @@ RUN pip install --no-cache-dir fastapi uvicorn uiautomator2 upnpclient
 # Copy over your core web application logic scripts
 COPY app.py index.html .
 
-# Expose your standard control interfaces (8833 and 8834)
+# Expose your standard control interfaces (8833 and 8834 run on host mode anyway)
 EXPOSE 8833 8834
 
 # Fire up your Python orchestrator daemon
