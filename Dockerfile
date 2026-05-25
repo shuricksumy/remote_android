@@ -32,8 +32,11 @@ RUN apk add --no-cache \
 # Copy over compiled distribution folder directly from the builder stage
 COPY --from=web-builder /build/dist /usr/local/lib/node_modules/ws-scrcpy
 
-# Link the binary command into path so app.py can invoke it globally
-RUN ln -s /usr/local/lib/node_modules/ws-scrcpy/index.js /usr/local/bin/ws-scrcpy
+# 🚀 FIX: Enforce permissions and create a safe shell wrapper execution binary link
+RUN chmod +x /usr/local/lib/node_modules/ws-scrcpy/index.js && \
+    echo '#!/bin/sh' > /usr/local/bin/ws-scrcpy && \
+    echo 'node /usr/local/lib/node_modules/ws-scrcpy/index.js "$@"' >> /usr/local/bin/ws-scrcpy && \
+    chmod +x /usr/local/bin/ws-scrcpy
 
 WORKDIR /app
 
