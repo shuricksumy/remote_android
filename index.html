@@ -15,10 +15,14 @@
             --secondary: #27272a;
             --secondary-hover: #3f3f46;
             --success: #10b981;
-            --warning: #f97316;
-            --warning-hover: #ea580c;
-            --danger: #ef4444;
-            --danger-hover: #dc2626;
+            --warning-muted: rgba(249, 115, 22, 0.1);
+            --warning-border: rgba(249, 115, 22, 0.4);
+            --warning-text: #fdba74;
+            --warning-hover: rgba(249, 115, 22, 0.2);
+            --danger-muted: rgba(239, 68, 68, 0.1);
+            --danger-border: rgba(239, 68, 68, 0.4);
+            --danger-text: #fca5a5;
+            --danger-hover: rgba(239, 68, 68, 0.2);
             --border: #27272a;
         }
 
@@ -35,12 +39,11 @@
             overflow: hidden;
         }
 
-        /* 🚀 RESPONSIVE UPDATE: Triggers stack layout earlier on medium screens */
         @media (max-width: 950px) {
             body {
                 grid-template-columns: 1fr;
-                grid-template-rows: auto minmax(500px, auto); /* Enforces a protective minimum height on the bottom area */
-                overflow-y: auto; /* Allows smooth scrolling across the full page stack */
+                grid-template-rows: auto minmax(500px, auto);
+                overflow-y: auto;
                 height: auto;
             }
         }
@@ -60,7 +63,7 @@
 
         @media (max-width: 950px) {
             .screen-monitor-panel {
-                height: 75vh; /* Gives the live stream ample viewport focus area on mobile/tablets */
+                height: 75vh;
                 border-right: none;
                 border-bottom: 1px solid var(--border);
             }
@@ -95,7 +98,7 @@
 
         @media (max-width: 950px) {
             .image-viewport {
-                max-height: 100%; /* Allows the video window container to scale natively inside the panel height */
+                max-height: 100%;
             }
         }
 
@@ -222,7 +225,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            transition: background-color 0.15s, transform 0.1s;
+            transition: all 0.15s ease, transform 0.1s;
         }
 
         .btn-full { width: 100%; }
@@ -231,13 +234,79 @@
         .btn-primary:hover { background-color: var(--primary-hover); }
         .btn-secondary { background-color: var(--secondary); border: 1px solid #3f3f46; }
         .btn-secondary:hover { background-color: var(--secondary-hover); }
-        .btn-warning { background-color: var(--warning); }
-        .btn-warning:hover { background-color: var(--warning-hover); }
-        .btn-danger { background-color: var(--danger); }
-        .btn-danger:hover { background-color: var(--danger-hover); }
+
+        .btn-warning-tonal {
+            background-color: var(--warning-muted);
+            border: 1px solid var(--warning-border);
+            color: var(--warning-text);
+        }
+        .btn-warning-tonal:hover { background-color: var(--warning-hover); }
+
+        .btn-danger-tonal {
+            background-color: var(--danger-muted);
+            border: 1px solid var(--danger-border);
+            color: var(--danger-text);
+        }
+        .btn-danger-tonal:hover { background-color: var(--danger-hover); }
 
         .btn:active { transform: scale(0.98); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+        /* ==============================================================================
+           🚀 NEW COLLAPSIBLE DRAWER STYLING
+           ============================================================================== */
+        .advanced-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding-top: 4px;
+            user-select: none;
+        }
+
+        .advanced-header:hover .advanced-title {
+            color: var(--text-main);
+        }
+
+        .advanced-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            transition: color 0.15s ease;
+        }
+
+        .chevron-icon {
+            width: 16px;
+            height: 16px;
+            fill: none;
+            stroke: var(--text-muted);
+            stroke-width: 2.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Drawer state animations */
+        .advanced-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), margin-top 0.25s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .advanced-panel.open .chevron-icon {
+            transform: rotate(180deg);
+            stroke: var(--primary);
+        }
+
+        .advanced-panel.open .advanced-content {
+            max-height: 100px; /* Expands to cleanly accommodate row height */
+            margin-top: 16px;
+        }
 
         .console-header {
             display: flex;
@@ -381,15 +450,29 @@
                     </button>
                 </div>
 
-                <button id="restartAppBtn" class="btn btn-warning" onclick="restartAudioApplication()">
-                    <div id="restartAppSpinner" class="spinner"></div>
-                    🔄 Restart Application
-                </button>
+                <div id="advancedPanel" class="advanced-panel">
+                    <div class="advanced-header" onclick="toggleAdvancedDrawer()">
+                        <span class="advanced-title">⚙️ Maintenance Settings</span>
+                        <svg class="chevron-icon" viewBox="0 0 24 24">
+                            <path d="M6 9l6 6 6-6"></path>
+                        </svg>
+                    </div>
 
-                <button id="rebootBtn" class="btn btn-danger" style="margin-top: 4px;" onclick="openRebootModal()">
-                    <div id="rebootSpinner" class="spinner"></div>
-                    Reboot Device
-                </button>
+                    <div class="advanced-content">
+                        <div class="row-buttons">
+                            <button id="restartAppBtn" class="btn btn-warning-tonal btn-flex" onclick="restartAudioApplication()">
+                                <div id="restartAppSpinner" class="spinner"></div>
+                                🔄 Restart App
+                            </button>
+
+                            <button id="rebootBtn" class="btn btn-danger-tonal btn-flex" onclick="openRebootModal()">
+                                <div id="rebootSpinner" class="spinner"></div>
+                                🛑 Reboot Device
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -430,6 +513,7 @@
     const consoleBox = document.getElementById('console');
     const rebootModal = document.getElementById('rebootModal');
     const streamFrame = document.getElementById('streamFrame');
+    const advancedPanel = document.getElementById('advancedPanel');
 
     function log(message, type = "info") {
         const time = new Date().toLocaleTimeString();
@@ -444,6 +528,11 @@
 
     function clearLogs() {
         consoleBox.innerHTML = '<div class="log-row"><span class="timestamp">[' + new Date().toLocaleTimeString() + ']</span> Logs cleared.</div>';
+    }
+
+    /* 🚀 TOGGLE HANDLER: Manages active state variables smoothly */
+    function toggleAdvancedDrawer() {
+        advancedPanel.classList.toggle('open');
     }
 
     function initializeLiveStream() {
@@ -525,7 +614,6 @@
         }
     }
 
-    // 🚀 ACTION ADDITION: Sends request payload down to the newly deployed backend restart endpoint
     async function restartAudioApplication() {
         restartAppBtn.disabled = true;
         restartAppSpinner.style.display = "inline-block";
