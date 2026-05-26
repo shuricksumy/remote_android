@@ -459,6 +459,29 @@ def trigger_device_unlock(background_tasks: BackgroundTasks):
     }
 
 
+@app.post("/restart-app")
+def trigger_audio_app_restart(background_tasks: BackgroundTasks):
+    """Force-terminates the player application process tree and relaunches it fresh."""
+
+    def perform_app_restart():
+        print(f"\n🔄 [API Request] Initiating fresh restart routine for package: {PACKAGE_NAME}")
+        d_inst = initialize_device(DEVICE_IP)
+        if d_inst:
+            print("🛑 Killing active process hooks...")
+            d_inst.app_stop(PACKAGE_NAME)
+            time.sleep(1.5)
+
+            print("🚀 Relaunching main application window activity layer...")
+            d_inst.app_start(PACKAGE_NAME)
+            print("🟢 App relaunch sequence processed successfully.")
+        else:
+            print("❌ [API Request] App restart aborted: ADB device handle unreachable.")
+
+    background_tasks.add_task(perform_app_restart)
+    return {
+        "message": "App restart sequence successfully triggered",
+        "detail": f"Force-stop and launch parameters dispatched for {PACKAGE_NAME}."
+    }
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     with open("index.html") as f:
