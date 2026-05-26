@@ -14,4 +14,5 @@ services:
       - PYTHONUNBUFFERED=1
       - WS_SCRCPY_CONFIG=/app/config.yaml
       # 🚀 INJECTED HERE: One single source of truth for your static IP!
-      - DEVICE_IP=192.168.111.48:5555
+      - DEVICE_IP=192.168.111.84:5555
+      - UPNP_FRIENDLY_NAME=Tablet

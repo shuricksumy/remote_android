@@ -15,7 +15,7 @@ import upnpclient
 DEVICE_IP = os.environ.get("DEVICE_IP", "192.168.111.48:5555")
 PACKAGE_NAME = "com.extreamsd.usbaudioplayerpro"
 GLOBAL_TIMEOUT = 10.0
-UPNP_FRIENDLY_NAME = "MI Player"
+UPNP_FRIENDLY_NAME = os.environ.get("UPNP_FRIENDLY_NAME", "Tablet")
 
 # Global pointer handle to track the live websocket streamer sub-process matrix
 WSSCRCPY_PROCESS = None

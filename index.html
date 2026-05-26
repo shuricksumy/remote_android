@@ -544,8 +544,7 @@
 
         const targetPort = "8834";
         const proxyPort = "8886";
-        const cleanDeviceIp = "192.168.111.48";
-        const devicePort = "5555";
+        const [cleanDeviceIp, devicePort] = DEVICE_IP.split(':');
 
         const baseHash = `#!action=stream`;
         const deviceUdid = `&udid=${cleanDeviceIp}%3A${devicePort}`;
