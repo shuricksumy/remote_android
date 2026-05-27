@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:background-color="http://www.w3.org/1999/xhtml">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -386,7 +386,7 @@
         <div class="modal-text">Are you sure you want to reboot the player hardware? This will terminate active audio playback instantly.</div>
         <div class="modal-actions" style="display: flex; gap: 12px;">
             <button class="btn btn-secondary btn-flex" onclick="closeRebootModal()">Cancel</button>
-            <button class="btn btn-danger btn-flex" onclick="confirmReboot()">Yes, Reboot</button>
+            <button class="btn btn-danger btn-flex" onclick="confirmReboot()" style="background-color: red;">Yes, Reboot</button>
         </div>
     </div>
 </div>
