@@ -430,7 +430,7 @@
             <div class="status-wrapper">
                 <div class="status-info">
                     <div class="status-title">Network Identity Status</div>
-                    <div style="font-size: 14px; font-weight:600; color: #fff; margin-top:2px;">MI Player</div>
+                    <div style="font-size: 14px; font-weight:600; color: #fff; margin-top:2px;">__UPNP_FRIENDLY_NAME__</div>
                 </div>
                 <span id="statusBadge" class="status-badge status-UNKNOWN">UNKNOWN</span>
             </div>
@@ -491,7 +491,7 @@
         ? "http://localhost:8833"
         : window.location.origin;
 
-    const DEVICE_IP = "192.168.111.48:5555";
+    const DEVICE_IP = "__DEVICE_IP__";
 
     const statusBadge = document.getElementById('statusBadge');
     const checkBtn = document.getElementById('checkBtn');

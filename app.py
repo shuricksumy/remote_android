@@ -487,13 +487,18 @@ def read_root():
     with open("index.html") as f:
         html_content = f.read()
 
-    # 🚀 LIVE JAVASCRIPT INJECTION: Swaps out the hardcoded address on load
-    clean_ip = DEVICE_IP.split(":")[0]  # Extracts just "192.168.111.48"
-    modified_html = html_content.replace(
-        'const DEVICE_IP = "192.168.111.48:5555";',
-        f'const DEVICE_IP = "{DEVICE_IP}";'
-    )
-    return modified_html
+    # 🚀 DYNAMIC INJECTION DICTIONARY
+    # Maps the placeholders in index.html to the live Python variables
+    replacements = {
+        "__DEVICE_IP__": DEVICE_IP,
+        "__UPNP_FRIENDLY_NAME__": UPNP_FRIENDLY_NAME
+    }
+
+    # Loop through the dictionary and apply all swaps
+    for placeholder, live_value in replacements.items():
+        html_content = html_content.replace(placeholder, str(live_value))
+
+    return html_content
 
 
 if __name__ == "__main__":
