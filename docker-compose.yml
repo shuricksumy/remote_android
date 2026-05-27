@@ -16,3 +16,6 @@ services:
       # 🚀 INJECTED HERE: One single source of truth for your static IP!
       - DEVICE_IP=192.168.111.84:5555
       - UPNP_FRIENDLY_NAME=Tablet
+      - WEB_PORT = "8833"
+      - WS_SCRCPY_PORT = "8834"
+      - PROXY_PORT = "8886"

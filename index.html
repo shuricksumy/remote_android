@@ -542,8 +542,8 @@
 
         const hostIp = window.location.hostname || "localhost";
 
-        const targetPort = "8834";
-        const proxyPort = "8886";
+        const targetPort = "__WS_SCRCPY_PORT__";
+        const proxyPort = "__PROXY_PORT__";
         const [cleanDeviceIp, devicePort] = DEVICE_IP.split(':');
 
         const baseHash = `#!action=stream`;

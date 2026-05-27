@@ -16,6 +16,9 @@ DEVICE_IP = os.environ.get("DEVICE_IP", "192.168.111.48:5555")
 PACKAGE_NAME = "com.extreamsd.usbaudioplayerpro"
 GLOBAL_TIMEOUT = 10.0
 UPNP_FRIENDLY_NAME = os.environ.get("UPNP_FRIENDLY_NAME", "Tablet")
+WEB_PORT = os.environ.get("WEB_PORT", "8833")
+WS_SCRCPY_PORT = os.environ.get("WS_SCRCPY_PORT", "8834")
+PROXY_PORT = os.environ.get("PROXY_PORT", "8886")
 
 # Global pointer handle to track the live websocket streamer sub-process matrix
 WSSCRCPY_PROCESS = None
@@ -491,7 +494,9 @@ def read_root():
     # Maps the placeholders in index.html to the live Python variables
     replacements = {
         "__DEVICE_IP__": DEVICE_IP,
-        "__UPNP_FRIENDLY_NAME__": UPNP_FRIENDLY_NAME
+        "__UPNP_FRIENDLY_NAME__": UPNP_FRIENDLY_NAME,
+        "__WS_SCRCPY_PORT__": WS_SCRCPY_PORT,
+        "__PROXY_PORT__": PROXY_PORT
     }
 
     # Loop through the dictionary and apply all swaps
@@ -504,4 +509,4 @@ def read_root():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8833)
+    uvicorn.run(app, host="0.0.0.0", port=int(WEB_PORT))
