@@ -1,8 +1,9 @@
 # ==============================================================================
 # STAGE 1: ISOLATED WEB BUILDER INTERFACES
 # ==============================================================================
-# Use Node 18 LTS to guarantee compatibility with ws-scrcpy's native C++ modules
-FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS web-builder
+# Node 24 LTS: ws-scrcpy's node-pty 0.10 builds through nan, which does not
+# compile against Node 26's V8 (renovate.json holds the major at 24)
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85 AS web-builder
 
 RUN apk add --no-cache git python3 make g++ gcc musl-dev
 
@@ -17,8 +18,8 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git . && \
 # ==============================================================================
 # STAGE 2: FINAL PRODUCTION PYTHON RUNTIME
 # ==============================================================================
-# Must use the exact same Node 18 base image so the compiled C++ binaries match the engine!
-FROM node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
+# Must use the exact same Node base image so the compiled C++ binaries match the engine!
+FROM node:24-alpine@sha256:8a32c8cf649a49915a66e81e7a609223c708d0adabf288ee3f4077d765542f85
 
 # Install Python, ADB, scrcpy, and required system tools directly via apk
 RUN apk add --no-cache \
