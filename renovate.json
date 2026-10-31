@@ -2,5 +2,13 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>shuricksumy/renovate-config"
+  ],
+  "packageRules": [
+    {
+      "description": "ws-scrcpy's node-pty 0.10 builds through nan, which does not compile against Node 26's V8: stay on Node 24 LTS (digest refreshes still come through)",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["node"],
+      "allowedVersions": "<25"
+    }
   ]
 }
