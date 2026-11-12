@@ -3,7 +3,7 @@
 # ==============================================================================
 # Node 24 LTS: ws-scrcpy's node-pty 0.10 builds through nan, which does not
 # compile against Node 26's V8 (renovate.json holds the major at 24)
-FROM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8 AS web-builder
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 AS web-builder
 
 RUN apk add --no-cache git python3 make g++ gcc musl-dev
 
@@ -19,7 +19,7 @@ RUN git clone https://github.com/NetrisTV/ws-scrcpy.git . && \
 # STAGE 2: FINAL PRODUCTION PYTHON RUNTIME
 # ==============================================================================
 # Must use the exact same Node base image so the compiled C++ binaries match the engine!
-FROM node:24-alpine@sha256:a34ab6d7f6f4813f4d0c5469d74685604b962fbdbf5793a7bc7b4998ecb867c8
+FROM node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
 
 # Install Python, ADB, scrcpy, and required system tools directly via apk
 RUN apk add --no-cache \
